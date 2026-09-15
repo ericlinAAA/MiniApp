@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>戰報</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    /* 象牙麻將牌配色（亮色模式）－ 靈感來自牌面本身：象牙底、墨色字、萬/索/筒三色印墨 */
+    --felt:      #0F3D2E;
+    --felt-mid:  #16543F;
+    --tile:      #F6F1E3;
+    --tile-2:    #EDE6D2;
+    --ink:       #1E1C16;
+    --ink-soft:  #6E6656;
+    --line:      #DED4B8;
+    --wan:       #B3271C; /* 萬｜紅 */
+    --suo:       #2F7A4D; /* 索｜綠 */
+    --tong:      #2C4870; /* 筒｜藍 */
+    --gold:      #B8860B; /* 莊｜金 */
+    --shadow: 0 1px 2px rgba(30,28,22,.08), 0 4px 14px rgba(30,28,22,.06);
+  }
+  [data-scheme="dark"]{
+    --felt:      #0A2A1F;
+    --felt-mid:  #123A2B;
+    --tile:      #14261D;
+    --tile-2:    #1B3226;
+    --ink:       #F3EEDD;
+    --ink-soft:  #9FB3A6;
+    --line:      #2A4234;
+    --wan:       #E2564A;
+    --suo:       #52C98B;
+    --tong:      #7FA0D6;
+    --gold:      #E3B44A;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--felt);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei","Segoe UI",sans-serif;
+    min-height:100vh;
+    padding-bottom:36px;
+  }
+  .num{font-family:"SF Mono","Roboto Mono",Menlo,Consolas,monospace; font-variant-numeric:tabular-nums;}
+
+  /* ---------- 頂部 ---------- */
+  header.hero{
+    background:linear-gradient(180deg, var(--felt) 0%, var(--felt-mid) 100%);
+    color:var(--tile);
+    padding:18px 16px 22px;
+    border-bottom:1px solid rgba(255,255,255,.08);
+  }
+  header.hero .eyebrow{font-size:13px; opacity:.7; letter-spacing:.02em;}
+  header.hero h1{margin:2px 0 0; font-size:22px; font-weight:700;}
+  header.hero .progress{margin-top:6px; font-size:14px; opacity:.85;}
+  header.hero .badge{
+    display:inline-block; margin-top:8px; padding:3px 10px; border-radius:20px;
+    background:rgba(255,255,255,.12); font-size:12px;
+  }
+  .trim-note{margin-top:8px; font-size:12px; opacity:.75; line-height:1.5;}
+
+  /* ---------- 玩家總覽（麻將牌造型頭像） ---------- */
+  .players{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    padding:14px 16px 4px;
+  }
+  .p-card{
+    background:var(--tile); border-radius:14px; padding:12px; box-shadow:var(--shadow);
+    border:1px solid var(--line); cursor:pointer; position:relative;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .p-card.active{outline:2px solid var(--accent); outline-offset:-2px;}
+  .p-card:active{transform:scale(.98);}
+  .p-tile{
+    width:34px; height:44px; border-radius:6px; background:var(--tile-2);
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center;
+    font-size:18px; font-weight:700; color:var(--accent); margin-bottom:8px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
+  }
+  .p-name{font-size:14px; font-weight:600; display:flex; align-items:center; gap:4px;}
+  .p-name .me-mark{font-size:11px; color:var(--ink-soft); font-weight:400;}
+  .p-rank{font-size:11px; color:var(--ink-soft); margin-top:1px;}
+  .p-money{font-size:19px; font-weight:700; margin-top:6px;}
+  .p-sub{font-size:11px; color:var(--ink-soft); margin-top:3px; line-height:1.5;}
+
+  /* ---------- Tab ---------- */
+  .tabbar{
+    display:flex; gap:6px; padding:14px 16px 0; overflow-x:auto;
+  }
+  .tabbar button{
+    appearance:none; border:1px solid var(--line); background:var(--tile);
+    color:var(--ink); padding:8px 14px; border-radius:20px; font-size:13px;
+    font-weight:600; white-space:nowrap; flex:0 0 auto;
+  }
+  .tabbar button.active{background:var(--felt); color:var(--tile); border-color:var(--felt);}
+  [data-scheme="dark"] .tabbar button.active{background:var(--gold); color:#1A1608; border-color:var(--gold);}
+
+  section.panel{ padding:14px 16px 8px; display:none; }
+  section.panel.active{display:block;}
+
+  .card{
+    background:var(--tile); border:1px solid var(--line); border-radius:14px;
+    padding:14px; margin-bottom:12px; box-shadow:var(--shadow);
+  }
+  .card h3{margin:0 0 10px; font-size:14px; font-weight:700; display:flex; justify-content:space-between; align-items:baseline;}
+  .card h3 .h-money{font-size:14px;}
+
+  /* 明細 */
+  .circle-header{
+    font-size:12px; font-weight:700; color:var(--tile); background:var(--felt-mid);
+    display:inline-block; padding:4px 10px; border-radius:8px; margin:14px 0 8px;
+  }
+  .circle-header:first-child{margin-top:0;}
+  .hand-row{
+    display:flex; justify-content:space-between; gap:8px; padding:9px 10px;
+    border-radius:10px; margin-bottom:6px; font-size:13.5px; line-height:1.45;
+    border-left:3px solid transparent;
+  }
+  .hand-row.involved{background:var(--tile-2); border-left-color:var(--accent-row); font-weight:600;}
+  .hand-row.bystander{opacity:.62; font-style:italic;}
+  .hand-row .who{flex:1;}
+  .hand-row .amt{white-space:nowrap;}
+  .amt.plus{color:var(--suo);}
+  .amt.minus{color:var(--wan);}
+  .ctx-tag{
+    display:inline-block; margin-left:6px; font-size:11px; padding:1px 6px;
+    border-radius:8px; background:rgba(184,134,11,.18); color:var(--gold);
+  }
+
+  /* 統計 */
+  .stat-sub{
+    display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0;
+    border-top:1px dashed var(--line); color:var(--ink-soft);
+  }
+  .stat-sub:first-of-type{border-top:none;}
+  .stat-sub .amt{color:var(--ink); font-weight:600;}
+
+  /* chart */
+  .chart-wrap{position:relative; height:280px;}
+  .legend-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:12px;}
+  .legend-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
+
+  .empty{color:var(--ink-soft); font-size:13px; text-align:center; padding:24px 0;}
+  footer.note{padding:18px 16px 6px; font-size:11.5px; color:rgba(246,241,227,.55); text-align:center;}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="eyebrow">麻將戰報 · Mahjong Report</div>
+  <h1 id="h-title">讀取中…</h1>
+  <div class="progress" id="h-progress"></div>
+  <span class="badge" id="h-badge"></span>
+  <div class="trim-note" id="h-trim" style="display:none;"></div>
+</header>
+
+<div class="players" id="players"></div>
+
+<div class="tabbar">
+  <button data-tab="hist" class="active">📜 每局明細</button>
+  <button data-tab="stat">📊 統計細項</button>
+  <button data-tab="trend">📉 盈虧走勢</button>
+  <button data-tab="analysis">🥧 來源分析</button>
+</div>
+
+<section class="panel active" id="panel-hist"></section>
+<section class="panel" id="panel-stat"></section>
+<section class="panel" id="panel-trend">
+  <div class="card">
+    <h3>盈虧走勢圖</h3>
+    <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    <div class="legend-row" id="trend-legend"></div>
+  </div>
+</section>
+<section class="panel" id="panel-analysis"></section>
+
+<footer class="note">資料僅存在於這個網址本身，不會上傳到任何伺服器</footer>
+
+<script>
+/* ============================================================
+   1. 讀取 Telegram WebApp 與資料
+   ============================================================ */
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+const scheme = (tg && tg.colorScheme) || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+document.documentElement.setAttribute('data-scheme', scheme);
+if (tg) {
+  try { tg.setHeaderColor(scheme === 'dark' ? '#0A2A1F' : '#0F3D2E'); } catch(e){}
+  try { tg.setBackgroundColor(scheme === 'dark' ? '#0A2A1F' : '#0F3D2E'); } catch(e){}
+}
+
+const SUIT_COLORS = ['#B3271C', '#2F7A4D', '#2C4870', '#B8860B'];
+const SUIT_COLORS_DARK = ['#E2564A', '#52C98B', '#7FA0D6', '#E3B44A'];
+const suitColor = (i) => (scheme === 'dark' ? SUIT_COLORS_DARK : SUIT_COLORS)[i];
+const WINDS = ['東','南','西','北'];
+const SHANTEN_NAMES = {'0': '聽牌', '1': '1進聽', 'away': '走遠了', 'notready': '沒聽牌'};
+const TYPE_RON = 0, TYPE_TSUMO = 1, TYPE_DRAW = 2;
+
+function b64urlToBytes(b64url){
+  let b64 = b64url.replace(/-/g,'+').replace(/_/g,'/');
+  while (b64.length % 4) b64 += '=';
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function loadPayload(){
+  const params = new URLSearchParams(window.location.search);
+  const d = params.get('d');
+  if (!d) return null;
+  try {
+    const bytes = b64urlToBytes(d);
+    const json = window.pako.inflate(bytes, {to: 'string'});
+    return JSON.parse(json);
+  } catch(e) {
+    console.error('資料解析失敗', e);
+    return null;
+  }
+}
+
+const DATA = loadPayload();
+
+/* ============================================================
+   2. 核心算錢公式（與 Python compute_round_deltas 完全一致）
+      規則：只有自摸會自動疊加莊家連莊台；胡／放槍照玩家喊的台數算。
+   ============================================================ */
+function computeDeltas(rec, base, taiScore){
+  const deltas = [0,0,0,0];
+  if (rec.type === TYPE_DRAW) return deltas;
+  const w = rec.winner, tai = rec.tai, d = rec.dealer, streak = rec.streak;
+
+  if (rec.type === TYPE_TSUMO){
+    for (let seat=0; seat<4; seat++){
+      if (seat === w) continue;
+      const extra = (w === d) ? 0 : ((seat === d) ? (1 + 2*streak) : 0);
+      const amt = base + (tai + extra) * taiScore;
+      deltas[w] += amt;
+      deltas[seat] -= amt;
+    }
+  } else { // ron
+    const amt = base + tai * taiScore;
+    deltas[w] += amt;
+    deltas[rec.loser] -= amt;
+  }
+  return deltas;
+}
+
+function rowsToRecords(rows){
+  return rows.map(r => ({
+    jiang: r[0], circle: r[1], dealer: r[2], streak: r[3], type: r[4],
+    winner: r[5], loser: r[6], tai: r[7], shanten: r[8],
+  }));
+}
+
+const RECORDS = DATA ? rowsToRecords(DATA.r) : [];
+const BASE = DATA ? DATA.base : 0;
+const TAI_SCORE = DATA ? DATA.tai : 0;
+const NAMES = DATA ? DATA.names : ['東','南','西','北'];
+
+let viewSeat = DATA ? DATA.my : 0;
+
+/* ============================================================
+   3. 畫面渲染
+   ============================================================ */
+function fmtSigned(n){
+  return (n>0? '+':'') + n.toLocaleString('zh-Hant');
+}
+function relName(seat){
+  if (seat === viewSeat) return '我';
+  const diff = (seat - viewSeat + 4) % 4;
+  return diff===1? '下家' : diff===2? '對家' : '上家';
+}
+
+function renderHeader(){
+  if (!DATA){
+    document.getElementById('h-title').textContent = '找不到戰報資料';
+    document.getElementById('h-progress').textContent = '請從 Bot 重新開啟這個網頁';
+    return;
+  }
+  document.getElementById('h-title').textContent = `${NAMES[DATA.my]}(${WINDS[DATA.my]}) 的戰報`;
+  document.getElementById('h-progress').textContent = `共打了 ${DATA.tr} 局・進度：${DATA.prog}`;
+  const badge = document.getElementById('h-badge');
+  badge.textContent = DATA.final ? '🏁 已結算' : '🀄 進行中';
+  if (DATA.trimmed){
+    const t = document.getElementById('h-trim');
+    t.style.display = 'block';
+    t.textContent = '⚠️ 局數較多，此網頁僅顯示最近 80 局明細；總計金額仍為完整正確數字。';
+  }
+}
+
+function renderPlayers(){
+  const wrap = document.getElementById('players');
+  wrap.innerHTML = '';
+  if (!DATA) return;
+  const order = [0,1,2,3].map(i=>i).sort((a,b)=> DATA.p[b][0]-DATA.p[a][0]);
+  order.forEach((seat, rank) => {
+    const p = DATA.p[seat];
+    const money = DATA.chips + p[0];
+    const div = document.createElement('div');
+    div.className = 'p-card' + (seat===viewSeat? ' active':'');
+    div.style.setProperty('--accent', suitColor(seat));
+    div.innerHTML = `
+      <div class="p-tile">${WINDS[seat]}</div>
+      <div class="p-name">${NAMES[seat]}${seat===DATA.my? '<span class="me-mark">（我）</span>':''}</div>
+      <div class="p-rank">${['🥇 第1名','🥈 第2名','🥉 第3名','💧 第4名'][rank]}${seat===DATA.dealerNow? '・莊':''}</div>
+      <div class="p-money num" style="color:${suitColor(seat)}">${fmtSigned(money)}</div>
+      <div class="p-sub">自摸${p[1]} 胡${p[2]} 放槍${p[3]} 被摸${p[4]}</div>
+    `;
+    div.addEventListener('click', () => { viewSeat = seat; renderAll(); });
+    wrap.appendChild(div);
+  });
+}
+
+/* ---------- 明細 tab ---------- */
+function buildHandLine(rec, viewer){
+  const dName = NAMES[rec.dealer];
+  let prefix = (rec.dealer === viewer ? '👑 ' : '👤 ') + dName + '上莊';
+  if (rec.streak > 0) prefix += ` 連${rec.streak}`;
+
+  let body = '', involved = false, amtClass = '', amtText = '';
+
+  if (rec.type === TYPE_DRAW){
+    body = '💨 臭連';
+  } else {
+    const deltas = computeDeltas(rec, BASE, TAI_SCORE);
+    if (rec.type === TYPE_TSUMO){
+      involved = true;
+      const w = rec.winner;
+      const wLabel = NAMES[w] + (w===viewer? '(我)':'');
+      if (viewer === w){
+        body = `🌟 ${wLabel} 自摸 ${rec.tai}台`;
+        amtClass='plus'; amtText = fmtSigned(deltas[w]);
+      } else {
+        body = `🌟 ${NAMES[w]} 自摸 ${rec.tai}台`;
+        amtClass='minus'; amtText = fmtSigned(deltas[viewer]);
+      }
+    } else {
+      const w = rec.winner, l = rec.loser;
+      const deltas = computeDeltas(rec, BASE, TAI_SCORE);
+      const amt = BASE + rec.tai * TAI_SCORE;
+      const wLabel = NAMES[w] + (w===viewer? '(我)':'');
+      const lLabel = NAMES[l] + (l===viewer? '(我)':'');
+      body = `🀄 ${wLabel} 胡 ${lLabel} ${rec.tai}台`;
+      if (viewer === w){ involved=true; amtClass='plus'; amtText = '+'+amt; }
+      else if (viewer === l){
+        involved=true; amtClass='minus'; amtText = '-'+amt;
+        if (viewer === DATA.my && DATA.track && rec.shanten){
+          body += `<span class="ctx-tag">${SHANTEN_NAMES[rec.shanten]||''}</span>`;
+        }
+      }
+      else { amtText = amt; }
+    }
+  }
+  return {prefix, body, involved, amtClass, amtText};
+}
+
+function renderHist(){
+  const el = document.getElementById('panel-hist');
+  el.innerHTML = '';
+  if (!DATA || RECORDS.length===0){ el.innerHTML = '<div class="empty">目前還沒有任何局數紀錄</div>'; return; }
+
+  let lastHeader = null;
+  RECORDS.forEach(rec => {
+    const key = rec.jiang + '-' + rec.circle;
+    if (key !== lastHeader){
+      const jiangStr = rec.jiang>0 ? `第${rec.jiang+1}將 ` : '';
+      const h = document.createElement('div');
+      h.className = 'circle-header';
+      h.textContent = `${jiangStr}${WINDS[rec.circle]}風圈`;
+      el.appendChild(h);
+      lastHeader = key;
+    }
+    const {prefix, body, involved, amtClass, amtText} = buildHandLine(rec, viewSeat);
+    const row = document.createElement('div');
+    row.className = 'hand-row ' + (involved? 'involved':'bystander');
+    if (involved){
+      const colorSeat = (rec.type === TYPE_DRAW) ? viewSeat
+        : (viewSeat === rec.winner ? viewSeat : rec.dealer);
+      row.style.setProperty('--accent-row', suitColor(colorSeat));
+    }
+    row.innerHTML = `<div class="who">${prefix}　${body}</div><div class="amt num ${amtClass}">${amtText? '('+amtText+'元)':''}</div>`;
+    el.appendChild(row);
+  });
+}
+
+/* ---------- 統計 tab ---------- */
+function renderStat(){
+  const el = document.getElementById('panel-stat');
+  el.innerHTML = '';
+  if (!DATA) return;
+
+  const buckets = {sd:[], win:[], dealin:[], sd_other:[]};
+  RECORDS.forEach(rec => {
+    if (rec.type === TYPE_DRAW) return;
+    const deltas = computeDeltas(rec, BASE, TAI_SCORE);
+    if (rec.type === TYPE_TSUMO){
+      if (rec.winner === viewSeat) buckets.sd.push({tai:rec.tai, money:deltas[viewSeat]});
+      else buckets.sd_other.push({tai:rec.tai, money:deltas[viewSeat]});
+    } else {
+      if (rec.winner === viewSeat) buckets.win.push({tai:rec.tai, money:deltas[viewSeat]});
+      else if (rec.loser === viewSeat){
+        const ctx = (viewSeat===DATA.my && DATA.track && rec.shanten) ? (SHANTEN_NAMES[rec.shanten]||'') : '';
+        buckets.dealin.push({tai:rec.tai, money:deltas[viewSeat], ctx});
+      }
+    }
+  });
+
+  const cfg = [
+    ['🌟 自摸', buckets.sd], ['🀄 胡牌', buckets.win],
+    ['💸 放槍', buckets.dealin], ['💥 被摸', buckets.sd_other],
+  ];
+  cfg.forEach(([label, list]) => {
+    const total = list.reduce((s,r)=>s+r.money,0);
+    const card = document.createElement('div');
+    card.className = 'card';
+    let subHtml = list.map(r =>
+      `<div class="stat-sub"><span>${r.tai}台${r.ctx? ' · '+r.ctx:''}</span><span class="amt num">${fmtSigned(r.money)}元</span></div>`
+    ).join('');
+    if (!subHtml) subHtml = '<div class="stat-sub"><span>尚無紀錄</span><span></span></div>';
+    card.innerHTML = `<h3>${label} ${list.length} 次<span class="h-money num">${fmtSigned(total)}元</span></h3>${subHtml}`;
+    el.appendChild(card);
+  });
+}
+
+/* ---------- 走勢圖 tab ---------- */
+let trendChart = null;
+function renderTrend(){
+  if (!DATA) return;
+  const chips = DATA.chips;
+  const profits = [0,0,0,0];
+  const points = [{label:'開局', profits:[0,0,0,0]}];
+  let currentPhase = null;
+
+  RECORDS.forEach(rec => {
+    const phase = rec.jiang+'-'+rec.circle+'-'+rec.dealer;
+    if (currentPhase !== null && phase !== currentPhase.key){
+      points.push({label: currentPhase.label, profits:[...profits]});
+    }
+    if (currentPhase === null || phase !== currentPhase.key){
+      const local = rec.dealer;
+      const isMultiJiang = RECORDS.some(r=>r.jiang>0);
+      let label;
+      if (!isMultiJiang) label = (local===0)? `${WINDS[rec.circle]}風東` : WINDS[local];
+      else label = (rec.circle===0)? `第${rec.jiang+1}將 ${WINDS[rec.circle]}` : WINDS[rec.circle];
+      currentPhase = {key: phase, label};
+    }
+    const deltas = computeDeltas(rec, BASE, TAI_SCORE);
+    for (let i=0;i<4;i++) profits[i]+=deltas[i];
+  });
+  if (currentPhase !== null) points.push({label: currentPhase.label, profits:[...profits]});
+
+  const labels = points.map(p=>p.label);
+  const datasets = [0,1,2,3].map(i => ({
+    label: NAMES[i],
+    data: points.map(p => chips + p.profits[i]),
+    borderColor: suitColor(i),
+    backgroundColor: suitColor(i),
+    tension: .25, pointRadius: 3, borderWidth: 2.5,
+  }));
+
+  const ctx = document.getElementById('chart-trend');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {labels, datasets},
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:getComputedStyle(document.body).getPropertyValue('--ink-soft'), font:{size:11}}, grid:{display:false} },
+        y:{ ticks:{color:getComputedStyle(document.body).getPropertyValue('--ink-soft'), font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
+      }
+    }
+  });
+
+  const legend = document.getElementById('trend-legend');
+  legend.innerHTML = [0,1,2,3].map(i=>
+    `<span><span class="legend-dot" style="background:${suitColor(i)}"></span>${NAMES[i]}</span>`
+  ).join('');
+}
+
+/* ---------- 來源分析 tab ---------- */
+let pieCharts = [];
+function renderAnalysis(){
+  const el = document.getElementById('panel-analysis');
+  el.innerHTML = '';
+  pieCharts.forEach(c=>c.destroy()); pieCharts = [];
+  if (!DATA) return;
+
+  const winCounts=[0,0,0,0], dealinCounts=[0,0,0,0], sdCounts=[0,0,0,0];
+  let draws=0;
+  RECORDS.forEach(rec=>{
+    if (rec.type===TYPE_DRAW){ draws++; return; }
+    if (rec.type===TYPE_RON){ winCounts[rec.winner]++; dealinCounts[rec.loser]++; }
+    else { sdCounts[rec.winner]++; }
+  });
+
+  function makeCard(title, counts, extraLabel, extraVal){
+    const card = document.createElement('div');
+    card.className='card';
+    const canvasId = 'pie-'+title;
+    card.innerHTML = `<h3>${title}</h3><div class="chart-wrap" style="height:220px;"><canvas id="${canvasId}"></canvas></div>`;
+    el.appendChild(card);
+    const labels = NAMES.slice();
+    const data = counts.slice();
+    if (extraLabel){ labels.push(extraLabel); data.push(extraVal); }
+    const colors = [0,1,2,3].map(suitColor);
+    if (extraLabel) colors.push('#8C8477');
+    const chart = new Chart(document.getElementById(canvasId), {
+      type:'doughnut',
+      data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:0}]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{position:'right', labels:{color:getComputedStyle(document.body).getPropertyValue('--ink'), font:{size:12}, boxWidth:10}}}}
+    });
+    pieCharts.push(chart);
+  }
+
+  makeCard('🀄 胡牌來源', winCounts, '流局', draws);
+  makeCard('💸 放槍去向', dealinCounts, null, null);
+  makeCard('🌟 自摸分佈', sdCounts, '流局', draws);
+}
+
+/* ---------- 整合 ---------- */
+function renderAll(){
+  renderHeader();
+  renderPlayers();
+  renderHist();
+  renderStat();
+  renderTrend();
+  renderAnalysis();
+}
+
+document.querySelectorAll('.tabbar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tabbar button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('section.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'trend' && trendChart) trendChart.resize();
+  });
+});
+
+renderAll();
+</script>
+</body>
+</html>
