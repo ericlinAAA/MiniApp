@@ -22,10 +22,12 @@
     --ink-soft:  #6E6656;
     --line:      #DED4B8;
     --on-felt:   #F8F4E7; /* 固定淺色：專供疊在深綠色（--felt/--felt-mid）上的文字使用，不隨深淺模式改變 */
-    --wan:       #B3271C; /* 萬｜紅 */
-    --suo:       #2F7A4D; /* 索｜綠 */
-    --tong:      #2C4870; /* 筒｜藍 */
-    --gold:      #B8860B; /* 莊｜金 */
+    /* 💡 這四色刻意選成「對深綠色桌布」跟「對象牙白卡片」都至少有 3.0 以上的 WCAG 對比度，
+       不論畫在哪種底色上都看得清楚，所以亮／暗模式共用同一組，不再分開設定。 */
+    --wan:       #F63131; /* 萬｜紅 */
+    --suo:       #48905C; /* 索｜綠 */
+    --tong:      #587DDD; /* 筒｜藍 */
+    --gold:      #A17B30; /* 莊｜金 */
     --shadow: 0 1px 2px rgba(30,28,22,.08), 0 4px 14px rgba(30,28,22,.06);
   }
   [data-scheme="dark"]{
@@ -37,10 +39,6 @@
     --ink:       #F3EEDD;
     --ink-soft:  #9FB3A6;
     --line:      #2A4234;
-    --wan:       #E2564A;
-    --suo:       #52C98B;
-    --tong:      #7FA0D6;
-    --gold:      #E3B44A;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -234,9 +232,10 @@ if (tg) {
   try { tg.setBackgroundColor(scheme === 'dark' ? '#0A2A1F' : '#0F3D2E'); } catch(e){}
 }
 
-const SUIT_COLORS = ['#B3271C', '#2F7A4D', '#2C4870', '#B8860B'];
-const SUIT_COLORS_DARK = ['#E2564A', '#52C98B', '#7FA0D6', '#E3B44A'];
-const suitColor = (i) => (scheme === 'dark' ? SUIT_COLORS_DARK : SUIT_COLORS)[i];
+// 💡 與 CSS 的 --wan/--suo/--tong/--gold 保持一致：這組顏色刻意選成
+//    對深綠色桌布跟象牙白卡片都有足夠對比度，亮／暗模式共用同一組。
+const SUIT_COLORS = ['#F63131', '#48905C', '#587DDD', '#A17B30'];
+const suitColor = (i) => SUIT_COLORS[i];
 const WINDS = ['東','南','西','北'];
 const SHANTEN_NAMES = {'0': '聽牌', '1': '1進聽', 'away': '走遠了', 'notready': '沒聽牌'};
 const TYPE_RON = 0, TYPE_TSUMO = 1, TYPE_DRAW = 2;
@@ -496,14 +495,31 @@ function computeAllTrendPoints(){
   return points;
 }
 
-function labelForPoint(pt, idx, points, isMultiJiang){
-  if (idx === 0) return pt.jiang === -1 ? '開局' : '將初';
-  if (!isMultiJiang){
-    // 單一將視角：直接用「東／南／西／北」標示莊家方位，不用複合命名
-    return WINDS[pt.local];
-  }
+function buildSingleJiangLabels(points){
+  // 💡 判斷「是不是這一圈的第一個莊家」不能看座位編號是否為 0——
+  //    重新抓位後座位編號會被打散，改成直接偵測「圈風本身有沒有換」，
+  //    這樣不管有沒有重新抓位過，順序都一定正確。
+  const labels = [];
+  let lastCircle = null, posInCircle = 0;
+  points.forEach((pt, idx) => {
+    if (idx === 0){
+      labels.push(pt.jiang === -1 ? '開局' : '將初');
+      lastCircle = pt.circle; posInCircle = 0;
+      return;
+    }
+    if (pt.circle !== lastCircle){ posInCircle = 0; lastCircle = pt.circle; }
+    labels.push(posInCircle === 0 ? `${WINDS[pt.circle]}風東` : WINDS[posInCircle]);
+    posInCircle++;
+  });
+  return labels;
+}
+
+function buildAllJiangLabels(points){
   // 全部（合併）視角：維持原本每點皆標示圈風名稱的方式（不跳過）
-  return (pt.circle === 0) ? `第${pt.jiang+1}將 ${WINDS[pt.circle]}` : WINDS[pt.circle];
+  return points.map((pt, idx) => {
+    if (idx === 0) return pt.jiang === -1 ? '開局' : '將初';
+    return (pt.circle === 0) ? `第${pt.jiang+1}將 ${WINDS[pt.circle]}` : WINDS[pt.circle];
+  });
 }
 
 let selectedJiang = 'all'; // 'all' 或 0-indexed 將數
@@ -537,21 +553,21 @@ function renderTrend(){
 
   let points;
   let titleSuffix = '（全部）';
-  let isMultiJiang = false;
+  let isMultiJiangView;
   if (selectedJiang === 'all'){
     points = allPoints;
-    isMultiJiang = allPoints.some(p => p.jiang > 0);
+    isMultiJiangView = allPoints.some(p => p.jiang > 0); // 只有真的超過一將時，才用圈風重複標示的方式
   } else {
     const idxList = [];
     allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
     const startIdx = Math.max(0, idxList[0] - 1); // 帶入該將開始前一點，作為視覺起點
     points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
-    isMultiJiang = false; // 選定單一將時，一律用簡單的東南西北標示
+    isMultiJiangView = false; // 選定單一將時，一律用東風東／南／西／北的方式
     titleSuffix = `（第${selectedJiang+1}將）`;
   }
   document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
 
-  const labels = points.map((p, idx) => labelForPoint(p, idx, points, isMultiJiang));
+  const labels = isMultiJiangView ? buildAllJiangLabels(points) : buildSingleJiangLabels(points);
 
   const datasets = [0,1,2,3].map(i => ({
     label: NAMES[i],
@@ -615,9 +631,9 @@ function renderAnalysis(){
     data:{
       labels: NAMES,
       datasets:[
-        {label:'胡牌', data:winCounts, backgroundColor:'#2F7A4D'},
-        {label:'放槍', data:dealinCounts, backgroundColor:'#B3271C'},
-        {label:'自摸', data:sdCounts, backgroundColor:'#B8860B'},
+        {label:'胡牌', data:winCounts, backgroundColor:'#48905C'},
+        {label:'放槍', data:dealinCounts, backgroundColor:'#F63131'},
+        {label:'自摸', data:sdCounts, backgroundColor:'#A17B30'},
       ]
     },
     options:{
@@ -631,17 +647,22 @@ function renderAnalysis(){
   });
   pieCharts.push(barChart); // 沿用同一個銷毀清單，切分頁重繪時一併清掉
 
-  function makeCard(title, counts, moneys, extraLabel, extraCount, actionLabel){
+  function makeCard(title, counts, moneys, extras, actionLabel){
     const card = document.createElement('div');
     card.className='card';
     const canvasId = 'pie-'+title;
     card.innerHTML = `<h3>${title}</h3><div class="chart-wrap" style="height:220px;"><canvas id="${canvasId}"></canvas></div>`;
     el.appendChild(card);
 
+    const extraColors = ['#8C8477', '#907F65']; // 💡 額外分類（例如自摸／臭連）各用不同灰階色，避免跟四家顏色搶戲又能互相區分
     const labels = NAMES.slice();
     const data = counts.slice();
     const colors = [0,1,2,3].map(suitColor);
-    if (extraLabel){ labels.push(extraLabel); data.push(extraCount); colors.push('#8C8477'); }
+    extras.forEach((ex, idx) => {
+      if (ex.count > 0){
+        labels.push(ex.label); data.push(ex.count); colors.push(extraColors[idx % extraColors.length]);
+      }
+    });
 
     const chart = new Chart(document.getElementById(canvasId), {
       type:'doughnut',
@@ -658,10 +679,12 @@ function renderAnalysis(){
         rows.push({label:`${NAMES[i]}：${actionLabel} ${counts[i]} 次 (${pct}%)`, money:moneys[i], color:suitColor(i)});
       }
     });
-    if (extraLabel && extraCount > 0){
-      const pct = (extraCount/tr*100).toFixed(1);
-      rows.push({label:`${extraLabel}：${extraCount} 次 (${pct}%)`, money:null, color:'#8C8477'});
-    }
+    extras.forEach((ex, idx) => {
+      if (ex.count > 0){
+        const pct = (ex.count/tr*100).toFixed(1);
+        rows.push({label:`${ex.label}：${ex.count} 次 (${pct}%)`, money:null, color:extraColors[idx % extraColors.length]});
+      }
+    });
     const detail = document.createElement('div');
     detail.className = 'legend-row';
     detail.style.flexDirection = 'column';
@@ -676,9 +699,11 @@ function renderAnalysis(){
   }
 
   const totalSd = sdCounts.reduce((a,b)=>a+b,0);
-  makeCard('🀄 胡牌來源', winCounts, winMoney, '臭連/自摸', draws + totalSd, '胡');
-  makeCard('💸 放槍去向', dealinCounts, dealinMoney, '自摸/臭連', totalSd + draws, '放槍');
-  makeCard('🌟 自摸分佈', sdCounts, sdMoney, '胡牌/臭連', RECORDS.filter(r=>r.type===TYPE_RON).length + draws, '自摸');
+  const totalWin = winCounts.reduce((a,b)=>a+b,0);
+  // 💡 「自摸」「臭連」「胡牌」都各自拆成獨立分類，不再合併成單一「自摸/臭連」這種模糊區塊
+  makeCard('🀄 胡牌來源', winCounts, winMoney, [{label:'自摸', count:totalSd}, {label:'臭連', count:draws}], '胡');
+  makeCard('💸 放槍去向', dealinCounts, dealinMoney, [{label:'自摸', count:totalSd}, {label:'臭連', count:draws}], '放槍');
+  makeCard('🌟 自摸分佈', sdCounts, sdMoney, [{label:'胡牌', count:totalWin}, {label:'臭連', count:draws}], '自摸');
 }
 
 /* ---------- 整合 ---------- */
