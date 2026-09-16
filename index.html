@@ -3,12 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<meta name="theme-color" content="#0F3D2E">
 <title>戰報</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
+    color-scheme: light;
     /* 象牙麻將牌配色（亮色模式）－ 靈感來自牌面本身：象牙底、墨色字、萬/索/筒三色印墨 */
     --felt:      #0F3D2E;
     --felt-mid:  #16543F;
@@ -17,6 +21,7 @@
     --ink:       #1E1C16;
     --ink-soft:  #6E6656;
     --line:      #DED4B8;
+    --on-felt:   #F8F4E7; /* 固定淺色：專供疊在深綠色（--felt/--felt-mid）上的文字使用，不隨深淺模式改變 */
     --wan:       #B3271C; /* 萬｜紅 */
     --suo:       #2F7A4D; /* 索｜綠 */
     --tong:      #2C4870; /* 筒｜藍 */
@@ -24,6 +29,7 @@
     --shadow: 0 1px 2px rgba(30,28,22,.08), 0 4px 14px rgba(30,28,22,.06);
   }
   [data-scheme="dark"]{
+    color-scheme: dark;
     --felt:      #0A2A1F;
     --felt-mid:  #123A2B;
     --tile:      #14261D;
@@ -41,7 +47,7 @@
   html,body{margin:0;padding:0;}
   body{
     background:var(--felt);
-    color:var(--ink);
+    color:var(--on-felt);
     font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei","Segoe UI",sans-serif;
     min-height:100vh;
     padding-bottom:36px;
@@ -51,7 +57,7 @@
   /* ---------- 頂部 ---------- */
   header.hero{
     background:linear-gradient(180deg, var(--felt) 0%, var(--felt-mid) 100%);
-    color:var(--tile);
+    color:var(--on-felt);
     padding:18px 16px 22px;
     border-bottom:1px solid rgba(255,255,255,.08);
   }
@@ -70,7 +76,7 @@
     padding:14px 16px 4px;
   }
   .p-card{
-    background:var(--tile); border-radius:14px; padding:12px; box-shadow:var(--shadow);
+    background:var(--tile); color:var(--ink); border-radius:14px; padding:12px; box-shadow:var(--shadow);
     border:1px solid var(--line); cursor:pointer; position:relative;
     transition:transform .12s ease, box-shadow .12s ease;
   }
@@ -90,21 +96,44 @@
 
   /* ---------- Tab ---------- */
   .tabbar{
-    display:flex; gap:6px; padding:14px 16px 0; overflow-x:auto;
+    display:flex; gap:8px; padding:14px 16px 10px;
+    overflow-x:auto; overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scroll-snap-type:x proximity;
+    scrollbar-width:none; /* Firefox */
   }
+  .tabbar::-webkit-scrollbar{ display:none; } /* Chrome / Telegram WebView */
   .tabbar button{
-    appearance:none; border:1px solid var(--line); background:var(--tile);
-    color:var(--ink); padding:8px 14px; border-radius:20px; font-size:13px;
+    appearance:none; border:1.5px solid var(--line); background:var(--tile);
+    color:var(--ink); padding:9px 16px; border-radius:20px; font-size:13px;
+    font-weight:600; white-space:nowrap; flex:0 0 auto; scroll-snap-align:start;
+    transition:background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .tabbar button:active{ transform:scale(.96); }
+  .tabbar button.active{
+    background:var(--gold); color:#1E1608; border-color:var(--gold);
+    box-shadow:0 2px 8px rgba(184,134,11,.35);
+  }
+  .tab-hint{
+    padding:0 16px; margin-top:-2px; font-size:11px; color:rgba(246,241,227,.5);
+  }
+  .jiang-tabbar{
+    display:flex; gap:6px; margin-bottom:10px; overflow-x:auto;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .jiang-tabbar::-webkit-scrollbar{ display:none; }
+  .jiang-tabbar button{
+    appearance:none; border:1.5px solid var(--line); background:var(--tile-2);
+    color:var(--ink); padding:6px 12px; border-radius:16px; font-size:12px;
     font-weight:600; white-space:nowrap; flex:0 0 auto;
   }
-  .tabbar button.active{background:var(--felt); color:var(--tile); border-color:var(--felt);}
-  [data-scheme="dark"] .tabbar button.active{background:var(--gold); color:#1A1608; border-color:var(--gold);}
+  .jiang-tabbar button.active{ background:var(--gold); color:#1E1608; border-color:var(--gold); font-weight:700; }
 
   section.panel{ padding:14px 16px 8px; display:none; }
   section.panel.active{display:block;}
 
   .card{
-    background:var(--tile); border:1px solid var(--line); border-radius:14px;
+    background:var(--tile); color:var(--ink); border:1px solid var(--line); border-radius:14px;
     padding:14px; margin-bottom:12px; box-shadow:var(--shadow);
   }
   .card h3{margin:0 0 10px; font-size:14px; font-weight:700; display:flex; justify-content:space-between; align-items:baseline;}
@@ -112,7 +141,7 @@
 
   /* 明細 */
   .circle-header{
-    font-size:12px; font-weight:700; color:var(--tile); background:var(--felt-mid);
+    font-size:12px; font-weight:700; color:var(--on-felt); background:var(--felt-mid);
     display:inline-block; padding:4px 10px; border-radius:8px; margin:14px 0 8px;
   }
   .circle-header:first-child{margin-top:0;}
@@ -121,8 +150,8 @@
     border-radius:10px; margin-bottom:6px; font-size:13.5px; line-height:1.45;
     border-left:3px solid transparent;
   }
-  .hand-row.involved{background:var(--tile-2); border-left-color:var(--accent-row); font-weight:600;}
-  .hand-row.bystander{opacity:.62; font-style:italic;}
+  .hand-row.involved{background:var(--tile-2); border-left-color:var(--accent-row); font-weight:600; color:var(--ink);}
+  .hand-row.bystander{background:var(--tile); color:var(--ink-soft); font-style:italic;}
   .hand-row .who{flex:1;}
   .hand-row .amt{white-space:nowrap;}
   .amt.plus{color:var(--suo);}
@@ -145,7 +174,10 @@
   .legend-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:12px;}
   .legend-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
 
-  .empty{color:var(--ink-soft); font-size:13px; text-align:center; padding:24px 0;}
+  .empty{
+    background:var(--tile); border:1px solid var(--line); border-radius:14px;
+    color:var(--ink-soft); font-size:13px; text-align:center; padding:24px 0;
+  }
   footer.note{padding:18px 16px 6px; font-size:11.5px; color:rgba(246,241,227,.55); text-align:center;}
 </style>
 </head>
@@ -161,18 +193,20 @@
 
 <div class="players" id="players"></div>
 
-<div class="tabbar">
+<div class="tabbar" id="tabbar">
   <button data-tab="hist" class="active">📜 每局明細</button>
   <button data-tab="stat">📊 統計細項</button>
   <button data-tab="trend">📉 盈虧走勢</button>
   <button data-tab="analysis">🥧 來源分析</button>
 </div>
+<div class="tab-hint">← 左右滑動可看更多 →</div>
 
 <section class="panel active" id="panel-hist"></section>
 <section class="panel" id="panel-stat"></section>
 <section class="panel" id="panel-trend">
+  <div class="jiang-tabbar" id="jiang-tabbar" style="display:none;"></div>
   <div class="card">
-    <h3>盈虧走勢圖</h3>
+    <h3 id="trend-title">盈虧走勢圖</h3>
     <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
     <div class="legend-row" id="trend-legend"></div>
   </div>
@@ -430,31 +464,79 @@ function renderStat(){
 }
 
 /* ---------- 走勢圖 tab ---------- */
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 let trendChart = null;
-function renderTrend(){
-  if (!DATA) return;
-  const chips = DATA.chips;
+function computeAllTrendPoints(){
   const profits = [0,0,0,0];
-  const points = [{label:'開局', profits:[0,0,0,0]}];
+  const points = [{label:'開局', jiang:-1, profits:[0,0,0,0]}];
   let currentPhase = null;
+  const isMultiJiang = RECORDS.some(r=>r.jiang>0);
 
   RECORDS.forEach(rec => {
     const phase = rec.jiang+'-'+rec.circle+'-'+rec.dealer;
     if (currentPhase !== null && phase !== currentPhase.key){
-      points.push({label: currentPhase.label, profits:[...profits]});
+      points.push({label: currentPhase.label, jiang: currentPhase.jiang, profits:[...profits]});
     }
     if (currentPhase === null || phase !== currentPhase.key){
       const local = rec.dealer;
-      const isMultiJiang = RECORDS.some(r=>r.jiang>0);
       let label;
       if (!isMultiJiang) label = (local===0)? `${WINDS[rec.circle]}風東` : WINDS[local];
       else label = (rec.circle===0)? `第${rec.jiang+1}將 ${WINDS[rec.circle]}` : WINDS[rec.circle];
-      currentPhase = {key: phase, label};
+      currentPhase = {key: phase, label, jiang: rec.jiang};
     }
     const deltas = computeDeltas(rec, BASE, TAI_SCORE);
     for (let i=0;i<4;i++) profits[i]+=deltas[i];
   });
-  if (currentPhase !== null) points.push({label: currentPhase.label, profits:[...profits]});
+  if (currentPhase !== null) points.push({label: currentPhase.label, jiang: currentPhase.jiang, profits:[...profits]});
+
+  return points;
+}
+
+let selectedJiang = 'all'; // 'all' 或 0-indexed 將數
+
+function renderJiangTabs(allPoints){
+  const jiangSet = [...new Set(allPoints.filter(p=>p.jiang>=0).map(p=>p.jiang))];
+  const bar = document.getElementById('jiang-tabbar');
+  if (jiangSet.length <= 1){
+    bar.style.display = 'none';
+    selectedJiang = 'all';
+    return;
+  }
+  bar.style.display = 'flex';
+  bar.innerHTML = '';
+  const mk = (val, text) => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.className = (selectedJiang === val) ? 'active' : '';
+    b.addEventListener('click', () => { selectedJiang = val; renderTrend(); });
+    return b;
+  };
+  bar.appendChild(mk('all', `全部（共${jiangSet.length}將）`));
+  jiangSet.forEach(j => bar.appendChild(mk(j, `第${j+1}將`)));
+}
+
+function renderTrend(){
+  if (!DATA) return;
+  const chips = DATA.chips;
+  const allPoints = computeAllTrendPoints();
+  renderJiangTabs(allPoints);
+
+  let points;
+  let titleSuffix = '（全部）';
+  if (selectedJiang === 'all'){
+    points = allPoints;
+  } else {
+    const idxList = [];
+    allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
+    const startIdx = Math.max(0, idxList[0] - 1); // 帶入該將開始前一點，作為視覺起點
+    points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
+    if (startIdx === 0) points[0] = {...points[0], label:'開局'};
+    else points[0] = {...points[0], label:`第${selectedJiang+1}將 將初`};
+    titleSuffix = `（第${selectedJiang+1}將）`;
+  }
+  document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
 
   const labels = points.map(p=>p.label);
   const datasets = [0,1,2,3].map(i => ({
@@ -474,8 +556,8 @@ function renderTrend(){
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false} },
       scales:{
-        x:{ ticks:{color:getComputedStyle(document.body).getPropertyValue('--ink-soft'), font:{size:11}}, grid:{display:false} },
-        y:{ ticks:{color:getComputedStyle(document.body).getPropertyValue('--ink-soft'), font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
+        x:{ ticks:{color:cssVar('--ink-soft'), font:{size:11}}, grid:{display:false} },
+        y:{ ticks:{color:cssVar('--ink-soft'), font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
       }
     }
   });
@@ -495,36 +577,68 @@ function renderAnalysis(){
   if (!DATA) return;
 
   const winCounts=[0,0,0,0], dealinCounts=[0,0,0,0], sdCounts=[0,0,0,0];
+  const winMoney=[0,0,0,0], dealinMoney=[0,0,0,0], sdMoney=[0,0,0,0];
   let draws=0;
   RECORDS.forEach(rec=>{
     if (rec.type===TYPE_DRAW){ draws++; return; }
-    if (rec.type===TYPE_RON){ winCounts[rec.winner]++; dealinCounts[rec.loser]++; }
-    else { sdCounts[rec.winner]++; }
+    const deltas = computeDeltas(rec, BASE, TAI_SCORE);
+    if (rec.type===TYPE_RON){
+      winCounts[rec.winner]++; winMoney[rec.winner]+=deltas[rec.winner];
+      dealinCounts[rec.loser]++; dealinMoney[rec.loser]+=deltas[rec.loser];
+    } else {
+      sdCounts[rec.winner]++; sdMoney[rec.winner]+=deltas[rec.winner];
+    }
   });
+  const tr = DATA.tr || RECORDS.length;
 
-  function makeCard(title, counts, extraLabel, extraVal){
+  function makeCard(title, counts, moneys, extraLabel, extraCount, actionLabel){
     const card = document.createElement('div');
     card.className='card';
     const canvasId = 'pie-'+title;
     card.innerHTML = `<h3>${title}</h3><div class="chart-wrap" style="height:220px;"><canvas id="${canvasId}"></canvas></div>`;
     el.appendChild(card);
+
     const labels = NAMES.slice();
     const data = counts.slice();
-    if (extraLabel){ labels.push(extraLabel); data.push(extraVal); }
     const colors = [0,1,2,3].map(suitColor);
-    if (extraLabel) colors.push('#8C8477');
+    if (extraLabel){ labels.push(extraLabel); data.push(extraCount); colors.push('#8C8477'); }
+
     const chart = new Chart(document.getElementById(canvasId), {
       type:'doughnut',
       data:{labels, datasets:[{data, backgroundColor:colors, borderWidth:0}]},
-      options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{legend:{position:'right', labels:{color:getComputedStyle(document.body).getPropertyValue('--ink'), font:{size:12}, boxWidth:10}}}}
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
     });
     pieCharts.push(chart);
+
+    // 💡 比照原本 Telegram 內建圖表：名字＋次數＋百分比＋金額
+    const rows = [];
+    [0,1,2,3].forEach(i=>{
+      if (counts[i] > 0){
+        const pct = (counts[i]/tr*100).toFixed(1);
+        rows.push({label:`${NAMES[i]}：${actionLabel} ${counts[i]} 次 (${pct}%)`, money:moneys[i], color:suitColor(i)});
+      }
+    });
+    if (extraLabel && extraCount > 0){
+      const pct = (extraCount/tr*100).toFixed(1);
+      rows.push({label:`${extraLabel}：${extraCount} 次 (${pct}%)`, money:null, color:'#8C8477'});
+    }
+    const detail = document.createElement('div');
+    detail.className = 'legend-row';
+    detail.style.flexDirection = 'column';
+    detail.style.gap = '6px';
+    detail.innerHTML = rows.map(r =>
+      `<div style="display:flex;justify-content:space-between;width:100%;">
+         <span><span class="legend-dot" style="background:${r.color}"></span>${r.label}</span>
+         ${r.money!==null? `<span class="num" style="font-weight:600;">${fmtSigned(r.money)}元</span>`:''}
+       </div>`
+    ).join('');
+    card.appendChild(detail);
   }
 
-  makeCard('🀄 胡牌來源', winCounts, '流局', draws);
-  makeCard('💸 放槍去向', dealinCounts, null, null);
-  makeCard('🌟 自摸分佈', sdCounts, '流局', draws);
+  const totalSd = sdCounts.reduce((a,b)=>a+b,0);
+  makeCard('🀄 胡牌來源', winCounts, winMoney, '臭連/自摸', draws + totalSd, '胡');
+  makeCard('💸 放槍去向', dealinCounts, dealinMoney, '自摸/臭連', totalSd + draws, '放槍');
+  makeCard('🌟 自摸分佈', sdCounts, sdMoney, '胡牌/臭連', RECORDS.filter(r=>r.type===TYPE_RON).length + draws, '自摸');
 }
 
 /* ---------- 整合 ---------- */
@@ -543,9 +657,21 @@ document.querySelectorAll('.tabbar button').forEach(btn=>{
     document.querySelectorAll('section.panel').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+    btn.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
     if (btn.dataset.tab === 'trend' && trendChart) trendChart.resize();
   });
 });
+
+// 桌面版滑鼠拖曳選單（手機本身就支援觸控滑動）
+(function enableDragScroll(el){
+  let isDown=false, startX=0, startScroll=0;
+  el.addEventListener('mousedown', e=>{ isDown=true; startX=e.pageX; startScroll=el.scrollLeft; });
+  window.addEventListener('mouseup', ()=>{ isDown=false; });
+  window.addEventListener('mousemove', e=>{
+    if(!isDown) return;
+    el.scrollLeft = startScroll - (e.pageX - startX);
+  });
+})(document.getElementById('tabbar'));
 
 renderAll();
 </script>
