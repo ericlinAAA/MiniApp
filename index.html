@@ -138,6 +138,13 @@
   }
   .card h3{margin:0 0 10px; font-size:14px; font-weight:700; display:flex; justify-content:space-between; align-items:baseline;}
   .card h3 .h-money{font-size:14px;}
+  .card h3 .h-money.plus{color:var(--suo);}
+  .card h3 .h-money.minus{color:var(--wan);}
+
+  /* 統計細項：盈／虧分類用邊框與底色明顯區分 */
+  .card.stat-gain{ border-left:4px solid var(--suo); }
+  .card.stat-loss{ border-left:4px solid var(--wan); background:var(--tile-2); opacity:.92; }
+  [data-scheme="dark"] .card.stat-loss{ opacity:.85; }
 
   /* 明細 */
   .circle-header{
@@ -168,6 +175,8 @@
   }
   .stat-sub:first-of-type{border-top:none;}
   .stat-sub .amt{color:var(--ink); font-weight:600;}
+  .stat-sub .amt.plus{color:var(--suo);}
+  .stat-sub .amt.minus{color:var(--wan);}
 
   /* chart */
   .chart-wrap{position:relative; height:280px;}
@@ -192,6 +201,12 @@
 </header>
 
 <div class="players" id="players"></div>
+
+<div class="card" id="overview-pie-card" style="margin:0 16px 14px;">
+  <h3>💰 目前籌碼佔比</h3>
+  <div class="chart-wrap" style="height:200px;"><canvas id="chart-overview-pie"></canvas></div>
+  <div class="empty" id="overview-pie-empty" style="display:none;box-shadow:none;margin-top:8px;">目前尚無盈虧資料</div>
+</div>
 
 <div class="tabbar" id="tabbar">
   <button data-tab="hist" class="active">📜 每局明細</button>
@@ -318,7 +333,7 @@ function renderHeader(){
     document.getElementById('h-progress').textContent = '請從 Bot 重新開啟這個網頁';
     return;
   }
-  document.getElementById('h-title').textContent = `${NAMES[DATA.my]}(${WINDS[DATA.my]}) 的戰報`;
+  document.getElementById('h-title').textContent = `${NAMES[viewSeat]}(${WINDS[viewSeat]}) 的戰報`;
   document.getElementById('h-progress').textContent = `共打了 ${DATA.tr} 局・進度：${DATA.prog}`;
   const badge = document.getElementById('h-badge');
   badge.textContent = DATA.final ? '🏁 已結算' : '🀄 進行中';
@@ -349,6 +364,46 @@ function renderPlayers(){
     `;
     div.addEventListener('click', () => { viewSeat = seat; renderAll(); });
     wrap.appendChild(div);
+  });
+}
+
+/* ---------- 總覽：籌碼佔比圓餅圖 ---------- */
+let overviewPie = null;
+function renderOverviewPie(){
+  if (!DATA) return;
+  const values = [0,1,2,3].map(i => DATA.chips + DATA.p[i][0]);
+  const pieValues = values.map(v => Math.max(0, v)); // 圓餅圖無法畫負值，負值仍會在圖例文字顯示實際數字
+  const total = pieValues.reduce((a,b)=>a+b, 0);
+
+  const ctx = document.getElementById('chart-overview-pie');
+  const emptyEl = document.getElementById('overview-pie-empty');
+  if (overviewPie){ overviewPie.destroy(); overviewPie = null; }
+
+  if (total <= 0){
+    ctx.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  ctx.style.display = '';
+  emptyEl.style.display = 'none';
+
+  overviewPie = new Chart(ctx, {
+    type:'pie',
+    data:{
+      labels: NAMES,
+      datasets:[{ data: pieValues, backgroundColor:[0,1,2,3].map(suitColor), borderWidth:0 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ position:'right', labels:{ color: cssVar('--ink'), font:{size:12}, boxWidth:10 } },
+        tooltip:{ callbacks:{ label: (ctx) => {
+          const i = ctx.dataIndex;
+          const pct = (pieValues[i]/total*100).toFixed(1);
+          return `${NAMES[i]}：${fmtSigned(values[i])}元 (${pct}%)`;
+        }}}
+      }
+    }
   });
 }
 
@@ -447,18 +502,20 @@ function renderStat(){
   });
 
   const cfg = [
-    ['🌟 自摸', buckets.sd], ['🀄 胡牌', buckets.win],
-    ['💸 放槍', buckets.dealin], ['💥 被摸', buckets.sd_other],
+    ['🌟 自摸', buckets.sd, 'gain'], ['🀄 胡牌', buckets.win, 'gain'],
+    ['💸 放槍', buckets.dealin, 'loss'], ['💥 被摸', buckets.sd_other, 'loss'],
   ];
-  cfg.forEach(([label, list]) => {
+  cfg.forEach(([label, list, kind]) => {
     const total = list.reduce((s,r)=>s+r.money,0);
     const card = document.createElement('div');
-    card.className = 'card';
-    let subHtml = list.map(r =>
-      `<div class="stat-sub"><span>${r.tai}台${r.ctx? ' · '+r.ctx:''}</span><span class="amt num">${fmtSigned(r.money)}元</span></div>`
-    ).join('');
+    card.className = `card stat-${kind}`;
+    let subHtml = list.map(r => {
+      const cls = r.money > 0 ? 'plus' : (r.money < 0 ? 'minus' : '');
+      return `<div class="stat-sub"><span>${r.tai}台${r.ctx? ' · '+r.ctx:''}</span><span class="amt num ${cls}">${fmtSigned(r.money)}元</span></div>`;
+    }).join('');
     if (!subHtml) subHtml = '<div class="stat-sub"><span>尚無紀錄</span><span></span></div>';
-    card.innerHTML = `<h3>${label} ${list.length} 次<span class="h-money num">${fmtSigned(total)}元</span></h3>${subHtml}`;
+    const totalCls = total > 0 ? 'plus' : (total < 0 ? 'minus' : '');
+    card.innerHTML = `<h3>${label} ${list.length} 次<span class="h-money num ${totalCls}">${fmtSigned(total)}元</span></h3>${subHtml}`;
     el.appendChild(card);
   });
 }
@@ -645,6 +702,7 @@ function renderAnalysis(){
 function renderAll(){
   renderHeader();
   renderPlayers();
+  renderOverviewPie();
   renderHist();
   renderStat();
   renderTrend();
