@@ -114,9 +114,6 @@
     background:var(--gold); color:#1E1608; border-color:var(--gold);
     box-shadow:0 2px 8px rgba(184,134,11,.35);
   }
-  .tab-hint{
-    padding:0 16px; margin-top:-2px; font-size:11px; color:rgba(246,241,227,.5);
-  }
   .jiang-tabbar{
     display:flex; gap:6px; margin-bottom:10px; overflow-x:auto;
     -webkit-overflow-scrolling:touch; scrollbar-width:none;
@@ -202,19 +199,12 @@
 
 <div class="players" id="players"></div>
 
-<div class="card" id="overview-pie-card" style="margin:0 16px 14px;">
-  <h3>💰 目前籌碼佔比</h3>
-  <div class="chart-wrap" style="height:200px;"><canvas id="chart-overview-pie"></canvas></div>
-  <div class="empty" id="overview-pie-empty" style="display:none;box-shadow:none;margin-top:8px;">目前尚無盈虧資料</div>
-</div>
-
 <div class="tabbar" id="tabbar">
   <button data-tab="hist" class="active">📜 每局明細</button>
   <button data-tab="stat">📊 統計細項</button>
   <button data-tab="trend">📉 盈虧走勢</button>
   <button data-tab="analysis">🥧 來源分析</button>
 </div>
-<div class="tab-hint">← 左右滑動可看更多 →</div>
 
 <section class="panel active" id="panel-hist"></section>
 <section class="panel" id="panel-stat"></section>
@@ -367,46 +357,6 @@ function renderPlayers(){
   });
 }
 
-/* ---------- 總覽：籌碼佔比圓餅圖 ---------- */
-let overviewPie = null;
-function renderOverviewPie(){
-  if (!DATA) return;
-  const values = [0,1,2,3].map(i => DATA.chips + DATA.p[i][0]);
-  const pieValues = values.map(v => Math.max(0, v)); // 圓餅圖無法畫負值，負值仍會在圖例文字顯示實際數字
-  const total = pieValues.reduce((a,b)=>a+b, 0);
-
-  const ctx = document.getElementById('chart-overview-pie');
-  const emptyEl = document.getElementById('overview-pie-empty');
-  if (overviewPie){ overviewPie.destroy(); overviewPie = null; }
-
-  if (total <= 0){
-    ctx.style.display = 'none';
-    emptyEl.style.display = 'block';
-    return;
-  }
-  ctx.style.display = '';
-  emptyEl.style.display = 'none';
-
-  overviewPie = new Chart(ctx, {
-    type:'pie',
-    data:{
-      labels: NAMES,
-      datasets:[{ data: pieValues, backgroundColor:[0,1,2,3].map(suitColor), borderWidth:0 }]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{
-        legend:{ position:'right', labels:{ color: cssVar('--ink'), font:{size:12}, boxWidth:10 } },
-        tooltip:{ callbacks:{ label: (ctx) => {
-          const i = ctx.dataIndex;
-          const pct = (pieValues[i]/total*100).toFixed(1);
-          return `${NAMES[i]}：${fmtSigned(values[i])}元 (${pct}%)`;
-        }}}
-      }
-    }
-  });
-}
-
 /* ---------- 明細 tab ---------- */
 function buildHandLine(rec, viewer){
   const dName = NAMES[rec.dealer];
@@ -527,28 +477,33 @@ function cssVar(name){
 let trendChart = null;
 function computeAllTrendPoints(){
   const profits = [0,0,0,0];
-  const points = [{label:'開局', jiang:-1, profits:[0,0,0,0]}];
+  const points = [{label:'開局', jiang:-1, circle:-1, local:0, profits:[0,0,0,0]}];
   let currentPhase = null;
-  const isMultiJiang = RECORDS.some(r=>r.jiang>0);
 
   RECORDS.forEach(rec => {
     const phase = rec.jiang+'-'+rec.circle+'-'+rec.dealer;
     if (currentPhase !== null && phase !== currentPhase.key){
-      points.push({label: currentPhase.label, jiang: currentPhase.jiang, profits:[...profits]});
+      points.push({...currentPhase, profits:[...profits]});
     }
     if (currentPhase === null || phase !== currentPhase.key){
-      const local = rec.dealer;
-      let label;
-      if (!isMultiJiang) label = (local===0)? `${WINDS[rec.circle]}風東` : WINDS[local];
-      else label = (rec.circle===0)? `第${rec.jiang+1}將 ${WINDS[rec.circle]}` : WINDS[rec.circle];
-      currentPhase = {key: phase, label, jiang: rec.jiang};
+      currentPhase = {key: phase, jiang: rec.jiang, circle: rec.circle, local: rec.dealer};
     }
     const deltas = computeDeltas(rec, BASE, TAI_SCORE);
     for (let i=0;i<4;i++) profits[i]+=deltas[i];
   });
-  if (currentPhase !== null) points.push({label: currentPhase.label, jiang: currentPhase.jiang, profits:[...profits]});
+  if (currentPhase !== null) points.push({...currentPhase, profits:[...profits]});
 
   return points;
+}
+
+function labelForPoint(pt, idx, points, isMultiJiang){
+  if (idx === 0) return pt.jiang === -1 ? '開局' : '將初';
+  if (!isMultiJiang){
+    // 單一將視角：直接用「東／南／西／北」標示莊家方位，不用複合命名
+    return WINDS[pt.local];
+  }
+  // 全部（合併）視角：維持原本每點皆標示圈風名稱的方式（不跳過）
+  return (pt.circle === 0) ? `第${pt.jiang+1}將 ${WINDS[pt.circle]}` : WINDS[pt.circle];
 }
 
 let selectedJiang = 'all'; // 'all' 或 0-indexed 將數
@@ -582,20 +537,22 @@ function renderTrend(){
 
   let points;
   let titleSuffix = '（全部）';
+  let isMultiJiang = false;
   if (selectedJiang === 'all'){
     points = allPoints;
+    isMultiJiang = allPoints.some(p => p.jiang > 0);
   } else {
     const idxList = [];
     allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
     const startIdx = Math.max(0, idxList[0] - 1); // 帶入該將開始前一點，作為視覺起點
     points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
-    if (startIdx === 0) points[0] = {...points[0], label:'開局'};
-    else points[0] = {...points[0], label:`第${selectedJiang+1}將 將初`};
+    isMultiJiang = false; // 選定單一將時，一律用簡單的東南西北標示
     titleSuffix = `（第${selectedJiang+1}將）`;
   }
   document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
 
-  const labels = points.map(p=>p.label);
+  const labels = points.map((p, idx) => labelForPoint(p, idx, points, isMultiJiang));
+
   const datasets = [0,1,2,3].map(i => ({
     label: NAMES[i],
     data: points.map(p => chips + p.profits[i]),
@@ -647,6 +604,32 @@ function renderAnalysis(){
     }
   });
   const tr = DATA.tr || RECORDS.length;
+
+  // 💡 長條圖：各家在三種事件上的次數比較，跟甜甜圈圖互補（甜甜圈看單一事件的組成，長條圖看跨事件的比較）
+  const barCard = document.createElement('div');
+  barCard.className = 'card';
+  barCard.innerHTML = '<h3>📊 各家次數比較</h3><div class="chart-wrap" style="height:240px;"><canvas id="bar-compare"></canvas></div>';
+  el.appendChild(barCard);
+  const barChart = new Chart(document.getElementById('bar-compare'), {
+    type:'bar',
+    data:{
+      labels: NAMES,
+      datasets:[
+        {label:'胡牌', data:winCounts, backgroundColor:'#2F7A4D'},
+        {label:'放槍', data:dealinCounts, backgroundColor:'#B3271C'},
+        {label:'自摸', data:sdCounts, backgroundColor:'#B8860B'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'top', labels:{ color:cssVar('--ink'), font:{size:12} } } },
+      scales:{
+        x:{ ticks:{color:cssVar('--ink'), font:{size:12}}, grid:{display:false} },
+        y:{ beginAtZero:true, ticks:{color:cssVar('--ink-soft'), stepSize:1, font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
+      }
+    }
+  });
+  pieCharts.push(barChart); // 沿用同一個銷毀清單，切分頁重繪時一併清掉
 
   function makeCard(title, counts, moneys, extraLabel, extraCount, actionLabel){
     const card = document.createElement('div');
@@ -702,7 +685,6 @@ function renderAnalysis(){
 function renderAll(){
   renderHeader();
   renderPlayers();
-  renderOverviewPie();
   renderHist();
   renderStat();
   renderTrend();
