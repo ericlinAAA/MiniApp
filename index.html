@@ -500,13 +500,9 @@ function computeAllTrendPoints(){
   return points;
 }
 
-function buildSingleJiangLabels(points, jiangKey){
-  // 💡 優先使用伺服器（Python）算好、已驗證正確的標籤，網頁端不再自己重新計算「單一將」的順序，
-  //    避免兩邊邏輯各自實作導致結果兜不起來。找不到對應資料時才退回本地計算（理論上不會發生）。
-  if (DATA && DATA.jiangLabels && jiangKey !== undefined && DATA.jiangLabels[jiangKey] &&
-      DATA.jiangLabels[jiangKey].length === points.length){
-    return DATA.jiangLabels[jiangKey];
-  }
+function buildSingleJiangLabels(points){
+  // 保底用的客戶端計算（正常情況下「第N將」一律直接用伺服器算好的 DATA.jiangLabels，
+  // 這支只在「全部」剛好只有一將、或存檔碼是舊格式沒有 jiangLabels 時才會被呼叫到）。
   const labels = [];
   let lastCircle = null, posInCircle = 0;
   points.forEach((pt, idx) => {
@@ -559,31 +555,55 @@ function renderTrend(){
   const allPoints = computeAllTrendPoints();
   renderJiangTabs(allPoints);
 
-  let points;
-  let titleSuffix = '（全部）';
-  let isMultiJiangView;
+  let labels, datasets, titleSuffix;
+
   if (selectedJiang === 'all'){
-    points = allPoints;
-    isMultiJiangView = allPoints.some(p => p.jiang > 0); // 只有真的超過一將時，才用圈風重複標示的方式
+    // 「全部」視角：維持既有、你已確認正確的客戶端計算方式
+    titleSuffix = '（全部）';
+    const isMultiJiangView = allPoints.some(p => p.jiang > 0);
+    labels = isMultiJiangView ? buildAllJiangLabels(allPoints) : buildSingleJiangLabels(allPoints);
+    datasets = [0,1,2,3].map(i => ({
+      label: NAMES[i],
+      data: allPoints.map(p => chips + p.profits[i]),
+      borderColor: suitColor(i),
+      backgroundColor: suitColor(i),
+      tension: .25, pointRadius: 3, borderWidth: 2.5,
+    }));
   } else {
-    const idxList = [];
-    allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
-    const startIdx = Math.max(0, idxList[0] - 1); // 帶入該將開始前一點，作為視覺起點
-    points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
-    isMultiJiangView = false; // 選定單一將時，一律用東風東／南／西／北的方式
+    // 💡「第N將」視角：標籤跟數值都直接用伺服器算好、已驗證正確的結果，
+    //    網頁端完全不再自己組資料，只負責畫圖——排除任何「客戶端邏輯兜不起來」的可能性。
+    const jiangKey = String(selectedJiang);
     titleSuffix = `（第${selectedJiang+1}將）`;
+    const serverLabels = DATA.jiangLabels && DATA.jiangLabels[jiangKey];
+    const serverSeries = DATA.jiangSeries && DATA.jiangSeries[jiangKey];
+
+    if (serverLabels && serverSeries){
+      labels = serverLabels;
+      datasets = [0,1,2,3].map(i => ({
+        label: NAMES[i],
+        data: serverSeries[i],
+        borderColor: suitColor(i),
+        backgroundColor: suitColor(i),
+        tension: .25, pointRadius: 3, borderWidth: 2.5,
+      }));
+    } else {
+      // 理論上不會發生（除非存檔碼是舊版沒有這兩個欄位），保底才在客戶端重算一次
+      const idxList = [];
+      allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
+      const startIdx = Math.max(0, idxList[0] - 1);
+      const points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
+      labels = buildSingleJiangLabels(points);
+      datasets = [0,1,2,3].map(i => ({
+        label: NAMES[i],
+        data: points.map(p => chips + p.profits[i]),
+        borderColor: suitColor(i),
+        backgroundColor: suitColor(i),
+        tension: .25, pointRadius: 3, borderWidth: 2.5,
+      }));
+    }
   }
+
   document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
-
-  const labels = isMultiJiangView ? buildAllJiangLabels(points) : buildSingleJiangLabels(points, String(selectedJiang));
-
-  const datasets = [0,1,2,3].map(i => ({
-    label: NAMES[i],
-    data: points.map(p => chips + p.profits[i]),
-    borderColor: suitColor(i),
-    backgroundColor: suitColor(i),
-    tension: .25, pointRadius: 3, borderWidth: 2.5,
-  }));
 
   const ctx = document.getElementById('chart-trend');
   if (trendChart) trendChart.destroy();
