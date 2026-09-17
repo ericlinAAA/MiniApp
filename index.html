@@ -179,6 +179,11 @@
 
   /* chart */
   .chart-wrap{position:relative; height:280px;}
+  .chart-scroll{
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
+    padding-bottom:4px;
+  }
+  .chart-scroll .chart-wrap{ height:280px; }
   .legend-row{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:12px;}
   .legend-dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px;}
 
@@ -214,7 +219,7 @@
   <div class="jiang-tabbar" id="jiang-tabbar" style="display:none;"></div>
   <div class="card">
     <h3 id="trend-title">盈虧走勢圖</h3>
-    <div class="chart-wrap"><canvas id="chart-trend"></canvas></div>
+    <div class="chart-scroll"><div class="chart-wrap" id="trend-chart-wrap"><canvas id="chart-trend"></canvas></div></div>
     <div class="legend-row" id="trend-legend"></div>
   </div>
 </section>
@@ -352,7 +357,7 @@ function renderPlayers(){
     div.innerHTML = `
       <div class="p-tile">${WINDS[seat]}</div>
       <div class="p-name">${NAMES[seat]}${seat===DATA.my? '<span class="me-mark">（我）</span>':''}</div>
-      <div class="p-rank">${['🥇 第1名','🥈 第2名','🥉 第3名','💧 第4名'][rank]}${seat===DATA.dealerNow? '・莊':''}</div>
+      <div class="p-rank">${['🥇 第1名','🥈 第2名','🥉 第3名','😭 第4名'][rank]}${seat===DATA.dealerNow? '・莊':''}</div>
       <div class="p-money num" style="color:${suitColor(seat)}">${fmtSigned(money)}</div>
       <div class="p-sub">自摸${p[1]} 胡${p[2]} 放槍${p[3]} 被摸${p[4]}</div>
     `;
@@ -605,6 +610,15 @@ function renderTrend(){
 
   document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
 
+  // 💡 關鍵修正：Chart.js 預設在空間不夠時會自動「隔一個跳一個」省略座標軸文字（autoSkip），
+  //    這才是「東風東 南 西 北」在窄螢幕上變成「南 北 南 北」的真正原因，跟資料內容無關。
+  //    做法：關掉 autoSkip，改成依資料點數量給圖表足夠寬度，容不下就讓使用者左右滑動，而不是偷偷藏字。
+  const wrap = document.getElementById('trend-chart-wrap');
+  const minPxPerPoint = 50;
+  const containerWidth = wrap.parentElement.clientWidth || 320;
+  const neededWidth = Math.max(containerWidth, labels.length * minPxPerPoint);
+  wrap.style.width = neededWidth + 'px';
+
   const ctx = document.getElementById('chart-trend');
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(ctx, {
@@ -614,7 +628,13 @@ function renderTrend(){
       responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:false} },
       scales:{
-        x:{ ticks:{color:cssVar('--ink-soft'), font:{size:11}}, grid:{display:false} },
+        x:{
+          ticks:{
+            color:cssVar('--ink-soft'), font:{size:11},
+            autoSkip:false, maxRotation:0, minRotation:0,
+          },
+          grid:{display:false}
+        },
         y:{ ticks:{color:cssVar('--ink-soft'), font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
       }
     }
