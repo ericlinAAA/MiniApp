@@ -84,6 +84,37 @@
             border-radius: 50%;
         }
 
+        /* 親友團捲入的分界線 */
+        .timeline-milestone {
+            position: relative;
+            margin: 40px 0;
+            width: 100%;
+        }
+        
+        .timeline-milestone::after {
+            content: '';
+            position: absolute;
+            left: -34px; /* 覆蓋在左側主線上 */
+            top: 50%;
+            width: calc(100% + 34px);
+            border-top: 2px dashed #d35400; /* 橘色虛線 */
+            z-index: 1;
+        }
+
+        .milestone-text {
+            position: relative;
+            z-index: 2;
+            background: #d35400;
+            color: white;
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1em;
+            margin-left: 20px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+
         .date {
             font-size: 1.2em;
             font-weight: bold;
@@ -158,6 +189,15 @@
             .timeline-item::before {
                 left: -29px;
             }
+            .timeline-milestone::after {
+                left: -24px;
+                width: calc(100% + 24px);
+            }
+            .milestone-text {
+                font-size: 0.85em;
+                margin-left: 0;
+                padding: 5px 12px;
+            }
         }
     </style>
 </head>
@@ -202,6 +242,11 @@
                     無人知曉的情況下，白哥與阿亮已訂好9月去大阪的機票。白哥還跑去台南找阿亮吃飯、去女方住處（被貓抓傷）。
                 </div>
             </div>
+        </div>
+
+        <!-- 🚨 親友團捲入分隔線 -->
+        <div class="timeline-milestone">
+            <div class="milestone-text">🚨 從這裡開始，親友團才正式捲入事件，白哥的演技大賞開幕 🚨</div>
         </div>
 
         <!-- 事件 3 -->
