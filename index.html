@@ -484,57 +484,10 @@ function cssVar(name){
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 let trendChart = null;
-function computeAllTrendPoints(){
-  const profits = [0,0,0,0];
-  const points = [{label:'開局', jiang:-1, circle:-1, local:0, profits:[0,0,0,0]}];
-  let currentPhase = null;
-
-  RECORDS.forEach(rec => {
-    const phase = rec.jiang+'-'+rec.circle+'-'+rec.dealer;
-    if (currentPhase !== null && phase !== currentPhase.key){
-      points.push({...currentPhase, profits:[...profits]});
-    }
-    if (currentPhase === null || phase !== currentPhase.key){
-      currentPhase = {key: phase, jiang: rec.jiang, circle: rec.circle, local: rec.dealer};
-    }
-    const deltas = computeDeltas(rec, BASE, TAI_SCORE);
-    for (let i=0;i<4;i++) profits[i]+=deltas[i];
-  });
-  if (currentPhase !== null) points.push({...currentPhase, profits:[...profits]});
-
-  return points;
-}
-
-function buildSingleJiangLabels(points){
-  // 保底用的客戶端計算（正常情況下「第N將」一律直接用伺服器算好的 DATA.jiangLabels，
-  // 這支只在「全部」剛好只有一將、或存檔碼是舊格式沒有 jiangLabels 時才會被呼叫到）。
-  const labels = [];
-  let lastCircle = null, posInCircle = 0;
-  points.forEach((pt, idx) => {
-    if (idx === 0){
-      labels.push(pt.jiang === -1 ? '開局' : '將初');
-      lastCircle = pt.circle; posInCircle = 0;
-      return;
-    }
-    if (pt.circle !== lastCircle){ posInCircle = 0; lastCircle = pt.circle; }
-    labels.push(posInCircle === 0 ? `${WINDS[pt.circle]}風東` : WINDS[posInCircle]);
-    posInCircle++;
-  });
-  return labels;
-}
-
-function buildAllJiangLabels(points){
-  // 全部（合併）視角：維持原本每點皆標示圈風名稱的方式（不跳過）
-  return points.map((pt, idx) => {
-    if (idx === 0) return pt.jiang === -1 ? '開局' : '將初';
-    return (pt.circle === 0) ? `第${pt.jiang+1}將 ${WINDS[pt.circle]}` : WINDS[pt.circle];
-  });
-}
-
 let selectedJiang = 'all'; // 'all' 或 0-indexed 將數
 
-function renderJiangTabs(allPoints){
-  const jiangSet = [...new Set(allPoints.filter(p=>p.jiang>=0).map(p=>p.jiang))];
+function renderJiangTabs(){
+  const jiangSet = Object.keys(DATA.trendByJiang || {}).map(Number).sort((a,b)=>a-b);
   const bar = document.getElementById('jiang-tabbar');
   if (jiangSet.length <= 1){
     bar.style.display = 'none';
@@ -556,68 +509,26 @@ function renderJiangTabs(allPoints){
 
 function renderTrend(){
   if (!DATA) return;
-  const chips = DATA.chips;
-  const allPoints = computeAllTrendPoints();
-  renderJiangTabs(allPoints);
+  renderJiangTabs();
 
-  let labels, datasets, titleSuffix;
-
-  if (selectedJiang === 'all'){
-    // 「全部」視角：維持既有、你已確認正確的客戶端計算方式
-    titleSuffix = '（全部）';
-    const isMultiJiangView = allPoints.some(p => p.jiang > 0);
-    labels = isMultiJiangView ? buildAllJiangLabels(allPoints) : buildSingleJiangLabels(allPoints);
-    datasets = [0,1,2,3].map(i => ({
-      label: NAMES[i],
-      data: allPoints.map(p => chips + p.profits[i]),
-      borderColor: suitColor(i),
-      backgroundColor: suitColor(i),
-      tension: .25, pointRadius: 3, borderWidth: 2.5,
-    }));
-  } else {
-    // 💡「第N將」視角：標籤跟數值都直接用伺服器算好、已驗證正確的結果，
-    //    網頁端完全不再自己組資料，只負責畫圖——排除任何「客戶端邏輯兜不起來」的可能性。
-    const jiangKey = String(selectedJiang);
-    titleSuffix = `（第${selectedJiang+1}將）`;
-    const serverLabels = DATA.jiangLabels && DATA.jiangLabels[jiangKey];
-    const serverSeries = DATA.jiangSeries && DATA.jiangSeries[jiangKey];
-
-    if (serverLabels && serverSeries){
-      labels = serverLabels;
-      datasets = [0,1,2,3].map(i => ({
-        label: NAMES[i],
-        data: serverSeries[i],
-        borderColor: suitColor(i),
-        backgroundColor: suitColor(i),
-        tension: .25, pointRadius: 3, borderWidth: 2.5,
-      }));
-    } else {
-      // 理論上不會發生（除非存檔碼是舊版沒有這兩個欄位），保底才在客戶端重算一次
-      const idxList = [];
-      allPoints.forEach((p,idx)=>{ if (p.jiang === selectedJiang) idxList.push(idx); });
-      const startIdx = Math.max(0, idxList[0] - 1);
-      const points = allPoints.slice(startIdx, idxList[idxList.length-1] + 1);
-      labels = buildSingleJiangLabels(points);
-      datasets = [0,1,2,3].map(i => ({
-        label: NAMES[i],
-        data: points.map(p => chips + p.profits[i]),
-        borderColor: suitColor(i),
-        backgroundColor: suitColor(i),
-        tension: .25, pointRadius: 3, borderWidth: 2.5,
-      }));
-    }
-  }
+  // 💡 標籤跟四家數值一律直接用伺服器算好、已驗證正確的結果，網頁端完全不組資料、不做計算，
+  //    只負責把拿到的東西畫出來——徹底排除「客戶端邏輯兜不起來」的可能性。
+  //    每一圈只有「第一個點」有文字（東／南／西／北，「全部」視角東圈會加「第N將」），
+  //    其餘點留空字串，這樣座標軸永遠乾淨、不需要縮寫或省略判斷，也不會被繪圖套件自己藏字。
+  const key = selectedJiang === 'all' ? null : String(selectedJiang);
+  const bundle = key ? DATA.trendByJiang[key] : DATA.trendAll;
+  const titleSuffix = key ? `（第${selectedJiang+1}將）` : '（全部）';
 
   document.getElementById('trend-title').textContent = '盈虧走勢圖' + titleSuffix;
 
-  // 💡 關鍵修正：Chart.js 預設在空間不夠時會自動「隔一個跳一個」省略座標軸文字（autoSkip），
-  //    這才是「東風東 南 西 北」在窄螢幕上變成「南 北 南 北」的真正原因，跟資料內容無關。
-  //    做法：關掉 autoSkip，改成依資料點數量給圖表足夠寬度，容不下就讓使用者左右滑動，而不是偷偷藏字。
-  const wrap = document.getElementById('trend-chart-wrap');
-  const minPxPerPoint = 50;
-  const containerWidth = wrap.parentElement.clientWidth || 320;
-  const neededWidth = Math.max(containerWidth, labels.length * minPxPerPoint);
-  wrap.style.width = neededWidth + 'px';
+  const labels = bundle.labels;
+  const datasets = [0,1,2,3].map(i => ({
+    label: NAMES[i],
+    data: bundle.series[i],
+    borderColor: suitColor(i),
+    backgroundColor: suitColor(i),
+    tension: .25, pointRadius: 3, borderWidth: 2.5,
+  }));
 
   const ctx = document.getElementById('chart-trend');
   if (trendChart) trendChart.destroy();
