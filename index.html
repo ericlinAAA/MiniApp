@@ -530,6 +530,19 @@ function renderTrend(){
     tension: .25, pointRadius: 3, borderWidth: 2.5,
   }));
 
+  // 💡 起始籌碼參考線：不管 Y 軸自動縮放到多緊，都清楚看得出「大家從這個數字開始」，
+  //    比照原生 Telegram 圖片版的做法（那邊也有畫一條起始籌碼虛線）。
+  datasets.push({
+    label: '起始籌碼',
+    data: labels.map(() => DATA.chips),
+    borderColor: 'rgba(128,128,128,.55)',
+    backgroundColor: 'rgba(128,128,128,.55)',
+    borderDash: [6,4],
+    pointRadius: 0,
+    borderWidth: 1.5,
+    tension: 0,
+  });
+
   const ctx = document.getElementById('chart-trend');
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(ctx, {
@@ -546,7 +559,13 @@ function renderTrend(){
           },
           grid:{display:false}
         },
-        y:{ ticks:{color:cssVar('--ink-soft'), font:{size:11}}, grid:{color:'rgba(128,128,128,.15)'} },
+        y:{
+          ticks:{
+            color:cssVar('--ink-soft'), font:{size:11},
+            callback:(v)=>v.toLocaleString('zh-Hant'),
+          },
+          grid:{color:'rgba(128,128,128,.15)'}
+        },
       }
     }
   });
@@ -554,7 +573,7 @@ function renderTrend(){
   const legend = document.getElementById('trend-legend');
   legend.innerHTML = [0,1,2,3].map(i=>
     `<span><span class="legend-dot" style="background:${suitColor(i)}"></span>${NAMES[i]}</span>`
-  ).join('');
+  ).join('') + `<span><span class="legend-dot" style="background:rgba(128,128,128,.55)"></span>起始籌碼</span>`;
 }
 
 /* ---------- 來源分析 tab ---------- */
