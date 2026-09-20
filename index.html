@@ -543,6 +543,14 @@ function renderTrend(){
     tension: 0,
   });
 
+  // 💡 明確指定 Y 軸範圍（比照原生圖片版 ax.set_ylim 的做法），不要依賴繪圖套件自己決定，
+  //    否則籌碼數字（例如 30000）容易被縮放邏輯拉到緊貼頂端甚至誤判成要從 0 開始畫。
+  const allValues = [0,1,2,3].flatMap(i => bundle.series[i]);
+  const minY = Math.min(...allValues, DATA.chips);
+  const maxY = Math.max(...allValues, DATA.chips);
+  const yRange = maxY - minY;
+  const yPadding = yRange > 0 ? yRange * 0.12 : Math.max(1000, DATA.chips * 0.05);
+
   const ctx = document.getElementById('chart-trend');
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(ctx, {
@@ -560,6 +568,8 @@ function renderTrend(){
           grid:{display:false}
         },
         y:{
+          min: minY - yPadding,
+          max: maxY + yPadding,
           ticks:{
             color:cssVar('--ink-soft'), font:{size:11},
             callback:(v)=>v.toLocaleString('zh-Hant'),
