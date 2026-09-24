@@ -192,9 +192,108 @@
     color:var(--ink-soft); font-size:13px; text-align:center; padding:24px 0;
   }
   footer.note{padding:18px 16px 6px; font-size:11.5px; color:rgba(246,241,227,.55); text-align:center;}
+
+  /* ---------- 即時模式：設定精靈 ---------- */
+  .wiz-step{ margin-bottom:14px; }
+  .wiz-label{ font-size:13px; font-weight:700; color:var(--on-felt); margin-bottom:8px; }
+  .wiz-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .wiz-btn{
+    appearance:none; border:1.5px solid var(--line); background:var(--tile);
+    color:var(--ink); padding:12px; border-radius:12px; font-size:14px; font-weight:600;
+    text-align:center;
+  }
+  .wiz-btn.active{ background:var(--gold); color:#1E1608; border-color:var(--gold); }
+  .wiz-input{
+    width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px;
+    border:1.5px solid var(--line); background:var(--tile); color:var(--ink);
+    font-size:15px; margin-bottom:8px;
+  }
+  .wiz-input::placeholder{ color:var(--ink-soft); }
+  .wiz-primary-btn{
+    width:100%; appearance:none; border:none; background:var(--felt-mid); color:var(--on-felt);
+    padding:13px; border-radius:12px; font-size:15px; font-weight:700; margin-top:6px;
+  }
+  .wiz-primary-btn:disabled{ opacity:.4; }
+  .wiz-secondary-btn{
+    width:100%; appearance:none; border:1.5px solid var(--line); background:transparent;
+    color:var(--on-felt); padding:11px; border-radius:12px; font-size:13px; font-weight:600; margin-top:8px;
+  }
+  .wiz-textarea{
+    width:100%; box-sizing:border-box; min-height:120px; padding:12px; border-radius:12px;
+    border:1.5px solid var(--line); background:var(--tile); color:var(--ink); font-size:13px;
+    font-family:inherit; margin-bottom:8px;
+  }
+  .wiz-error{ color:var(--wan); font-size:12.5px; margin:4px 0 8px; }
+
+  /* ---------- 即時模式：記分表單 ---------- */
+  .form-section-title{
+    font-size:12px; font-weight:700; color:var(--on-felt); background:var(--felt-mid);
+    display:inline-block; padding:4px 10px; border-radius:8px; margin:14px 0 8px;
+  }
+  .form-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+  .form-pbtn{
+    appearance:none; border:1.5px solid var(--line); background:var(--tile);
+    color:var(--ink); padding:11px 8px; border-radius:12px; font-size:13px; font-weight:600;
+  }
+  .form-pbtn.selected{ background:var(--suo); color:#fff; border-color:var(--suo); }
+  .form-pbtn.disabled{ opacity:.35; }
+  .form-wide-btn{
+    width:100%; appearance:none; border:1.5px solid var(--line); background:var(--tile-2);
+    color:var(--ink); padding:10px; border-radius:12px; font-size:13px; font-weight:600; margin-bottom:6px;
+  }
+  .form-wide-btn.selected{ background:var(--gold); color:#1E1608; border-color:var(--gold); }
+  .form-tai-grid{ display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:6px; }
+  .form-tai-btn{
+    appearance:none; border:1.5px solid var(--line); background:var(--tile);
+    color:var(--ink); padding:9px 0; border-radius:10px; font-size:13px; font-weight:600;
+  }
+  .form-tai-btn.selected{ background:var(--suo); color:#fff; border-color:var(--suo); }
+  .form-hint-card{
+    background:var(--tile); border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; margin-bottom:12px; box-shadow:var(--shadow); font-size:13px; color:var(--ink);
+  }
+  .form-sys-row{ display:flex; gap:8px; margin-top:10px; }
+  .form-sys-row button{
+    flex:1; appearance:none; border:1.5px solid var(--line); background:var(--tile-2);
+    color:var(--ink); padding:10px; border-radius:12px; font-size:12.5px; font-weight:600;
+  }
+  .savecode-box{
+    background:var(--tile-2); border:1px dashed var(--line); border-radius:10px;
+    padding:10px; font-size:11px; word-break:break-all; color:var(--ink-soft); margin:8px 0;
+    max-height:80px; overflow-y:auto;
+  }
 </style>
 </head>
 <body>
+
+<!-- ============================================================
+     即時計分模式：設定精靈 + 記分表單（沒有 ?d= 網址參數時顯示）
+     ============================================================ -->
+<div id="live-view" style="display:none;">
+  <header class="hero">
+    <div class="eyebrow">麻將計分 · 即時模式</div>
+    <h1 id="live-title">設定新局</h1>
+    <div class="progress" id="live-progress"></div>
+  </header>
+
+  <div id="setup-wizard" style="padding:16px;"></div>
+
+  <div id="scoring-app" style="display:none;">
+    <div class="players" id="live-players"></div>
+    <div id="live-form-wrap" style="padding:0 16px 14px;"></div>
+    <div class="tabbar" id="live-tabbar">
+      <button data-live-tab="score" class="active">🀄 記分</button>
+      <button data-live-tab="report">📊 戰報</button>
+    </div>
+    <div id="live-score-panel"></div>
+    <div id="live-report-panel" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     戰報檢視模式：既有內容（網址帶 ?d= 時顯示，或即時模式點「戰報」分頁時借用）
+     ============================================================ -->
+<div id="report-view">
 
 <header class="hero">
   <div class="eyebrow">麻將戰報 · Mahjong Report</div>
@@ -224,6 +323,8 @@
   </div>
 </section>
 <section class="panel" id="panel-analysis"></section>
+
+</div>
 
 <footer class="note">資料僅存在於這個網址本身，不會上傳到任何伺服器</footer>
 
@@ -273,7 +374,7 @@ function loadPayload(){
   }
 }
 
-const DATA = loadPayload();
+let DATA = loadPayload();
 
 /* ============================================================
    2. 核心算錢公式（與 Python compute_round_deltas 完全一致）
@@ -307,10 +408,10 @@ function rowsToRecords(rows){
   }));
 }
 
-const RECORDS = DATA ? rowsToRecords(DATA.r) : [];
-const BASE = DATA ? DATA.base : 0;
-const TAI_SCORE = DATA ? DATA.tai : 0;
-const NAMES = DATA ? DATA.names : ['東','南','西','北'];
+let RECORDS = DATA ? rowsToRecords(DATA.r) : [];
+let BASE = DATA ? DATA.base : 0;
+let TAI_SCORE = DATA ? DATA.tai : 0;
+let NAMES = DATA ? DATA.names : ['東','南','西','北'];
 
 let viewSeat = DATA ? DATA.my : 0;
 
@@ -705,6 +806,19 @@ function renderAll(){
   renderAnalysis();
 }
 
+// 💡 即時模式用：把 DATA/RECORDS/BASE/TAI_SCORE/NAMES 換成新資料後，
+//    直接重新呼叫既有的戰報渲染函式——記分表單跟戰報永遠共用同一套渲染邏輯，
+//    不會有「兩份程式碼各自實作、兜不起來」的風險。
+function refreshReportFromData(newData) {
+  DATA = newData;
+  RECORDS = rowsToRecords(DATA.r);
+  BASE = DATA.base;
+  TAI_SCORE = DATA.tai;
+  NAMES = DATA.names;
+  if (viewSeat >= NAMES.length) viewSeat = DATA.my;
+  renderAll();
+}
+
 document.querySelectorAll('.tabbar button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('.tabbar button').forEach(b=>b.classList.remove('active'));
@@ -727,7 +841,996 @@ document.querySelectorAll('.tabbar button').forEach(btn=>{
   });
 })(document.getElementById('tabbar'));
 
-renderAll();
+/* ============================================================
+   即時計分引擎（對應 MahjongCount.py 的 execute_submit /
+   generate_save_code / process_import_text，數值公式共用上面
+   已經驗證過的 computeDeltas，不重新發明一套）
+   ============================================================ */
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+function initGameState(){
+  return {
+    startingChips: 0, baseScore: 30, taiScore: 10, mySeat: 0,
+    roundIdx: 0, dealerIdx: 0, streak: 0, jiangCount: 0, isFinal: false, trackShanten: false,
+    startTime: formatDateTimeNow(),
+    names: ['東','南','西','北'],
+    stats: {
+      sd_me:{count:0, records:[], money:0}, win:{count:0, records:[], money:0},
+      dealin:{count:0, records:[], money:0}, sd_other:{count:0, records:[], money:0},
+    },
+    pStats: [0,1,2,3].map(()=>({sd:0, win:0, dealin:0, sd_other:0, money:0})),
+    shantenStats: {'0':0, '1':0, away:0, notready:0, tracked_rounds:0},
+    tableStats: {total_rounds:0},
+    undoStack: [],
+    roundLog: [],
+  };
+}
+function formatDateTimeNow(){
+  const d = new Date(); const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function engineExecuteSubmit(state, form){
+  const { undoStack: prevUndoStack, ...stateWithoutUndo } = state;
+  const snapshot = deepClone(stateWithoutUndo);
+  const s = deepClone(stateWithoutUndo);
+  s.undoStack = [...(prevUndoStack||[]), snapshot];
+
+  const currRoundIdx = s.roundIdx, currDealerIdx = s.dealerIdx, currStreak = s.streak, mySeat = s.mySeat;
+  s.tableStats.total_rounds += 1;
+
+  if (s.trackShanten){
+    s.shantenStats.tracked_rounds = (s.shantenStats.tracked_rounds||0) + 1;
+    if (form.shanten !== null && form.shanten !== undefined){
+      s.shantenStats[String(form.shanten)] = (s.shantenStats[String(form.shanten)]||0) + 1;
+    }
+  }
+  const shantenStr = (form.shanten !== null && form.shanten !== undefined) ? (SHANTEN_NAMES[String(form.shanten)]||'') : '';
+
+  let logType, logW, logL, logTai;
+  if (form.winner === 'draw'){ logType='draw'; logW=null; logL=null; logTai=0; }
+  else if (form.type === 'tsumo'){ logType='tsumo'; logW=form.winner; logL=null; logTai=form.tai; }
+  else { logType='ron'; logW=form.winner; logL=form.loser; logTai=form.tai; }
+
+  const rec = {jiang:s.jiangCount, circle:currRoundIdx, dealer:currDealerIdx, streak:currStreak,
+               type:logType, winner:logW, loser:logL, tai:logTai,
+               shanten:(form.shanten!==null && form.shanten!==undefined) ? String(form.shanten) : null};
+
+  const deltas = computeDeltas({type:logType==='draw'?TYPE_DRAW:(logType==='tsumo'?TYPE_TSUMO:TYPE_RON),
+                                 winner:logW, loser:logL, tai:logTai, dealer:currDealerIdx, streak:currStreak},
+                                s.baseScore, s.taiScore);
+
+  if (logType === 'tsumo'){
+    const w = logW;
+    for (let l=0;l<4;l++){
+      if (l===w) continue;
+      const amt = -deltas[l];
+      s.pStats[w].money += amt; s.pStats[l].money -= amt; s.pStats[l].sd_other += 1;
+      if (l===mySeat){
+        s.stats.sd_other.count += 1; s.stats.sd_other.money -= amt;
+        s.stats.sd_other.records.push({tai:logTai, money:-amt, context:''});
+      }
+    }
+    s.pStats[w].sd += 1;
+    if (w===mySeat){
+      s.stats.sd_me.count += 1; s.stats.sd_me.money += deltas[w];
+      s.stats.sd_me.records.push({tai:logTai, money:deltas[w], context:''});
+    }
+  } else if (logType === 'ron'){
+    const w=logW, l=logL, amt=deltas[w];
+    s.pStats[w].money += amt; s.pStats[l].money -= amt;
+    s.pStats[w].win += 1; s.pStats[l].dealin += 1;
+    if (w===mySeat){
+      s.stats.win.count += 1; s.stats.win.money += amt;
+      s.stats.win.records.push({tai:logTai, money:amt, context:''});
+    }
+    if (l===mySeat){
+      s.stats.dealin.count += 1; s.stats.dealin.money -= amt;
+      s.stats.dealin.records.push({tai:logTai, money:-amt, context:shantenStr});
+    }
+  }
+
+  s.roundLog.push(rec);
+
+  let jiangFinished = false;
+  if (form.winner==='draw' || form.winner===currDealerIdx){
+    s.streak += 1;
+  } else {
+    s.streak = 0;
+    s.dealerIdx = (currDealerIdx+1)%4;
+    if (s.dealerIdx===0){
+      s.roundIdx += 1;
+      if (s.roundIdx===4){ s.roundIdx=0; s.jiangCount+=1; jiangFinished=true; }
+    }
+  }
+  if (jiangFinished) s.isFinal = true;
+  return {state: s, jiangFinished};
+}
+
+function engineUndo(state){
+  if (!state.undoStack || state.undoStack.length===0) return state;
+  const stack = state.undoStack.slice(0,-1);
+  const prev = deepClone(state.undoStack[state.undoStack.length-1]);
+  prev.undoStack = stack;
+  return prev;
+}
+
+function buildSaveDataObject(state){
+  const pStatsObj = {};
+  state.pStats.forEach((p,i)=>{ pStatsObj[String(i)] = p; });
+  return {
+    v:3, start_time:state.startTime, chips:state.startingChips, base:state.baseScore, tai:state.taiScore,
+    names:state.names, p_stats:pStatsObj, stats:state.stats, table_stats:state.tableStats,
+    shanten_stats:state.shantenStats, history:[], round_log:state.roundLog, my_seat:state.mySeat,
+    jiang:state.jiangCount, round:state.roundIdx, dealer:state.dealerIdx, streak:state.streak, track:state.trackShanten,
+  };
+}
+function generateSaveCodeText(state){
+  const jsonStr = JSON.stringify(buildSaveDataObject(state));
+  const compressed = window.pako.deflate(jsonStr);
+  let bin = '';
+  compressed.forEach(b => bin += String.fromCharCode(b));
+  const b64 = btoa(bin);
+  return `[SaveCodeV2]${b64}[/SaveCodeV2]`;
+}
+
+// ---------- 存檔碼／戰報文字匯入（對應 process_import_text） ----------
+function parseSaveCodeText(text){
+  const m = text.match(/\[SaveCodeV2\]([\s\S]*?)\[\/SaveCodeV2\]/);
+  if (!m) return null;
+  const b64 = m[1].trim();
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const jsonStr = window.pako.inflate(bytes, {to:'string'});
+  return JSON.parse(jsonStr);
+}
+
+function legacyRoundLogFromHistory(historyTuples, names, mySeat){
+  const log = [];
+  let currJiang=0, currCircle=0;
+  const stripTags = s => s.replace(/<[^>]+>/g,'');
+  historyTuples.forEach(([rIdx, line])=>{
+    if (rIdx===-1){
+      const m = line.match(/<b>(?:第(\d+)將\s*)?([東南西北])風圈<\/b>/);
+      if (m){ if (m[1]) currJiang = parseInt(m[1],10)-1; currCircle = WINDS.indexOf(m[2]); }
+      return;
+    }
+    const raw = stripTags(line);
+    const dm = raw.match(/(?:👑|👤)(.*?)(?:上莊|風莊|莊)(?:\s*連(\d+))?/u);
+    const streak = (dm && dm[2]) ? parseInt(dm[2],10) : 0;
+    let dealerIdx = mySeat;
+    if (dm && dm[1]){
+      const dStr = dm[1].trim();
+      const ni = names.indexOf(dStr), wi = WINDS.indexOf(dStr);
+      if (ni>=0) dealerIdx = ni; else if (wi>=0) dealerIdx = wi;
+    }
+    const smSd = raw.match(/🌟\s*(.*?)(?:\(我\))?\s*自摸\s*(\d+)台/u);
+    const smRon = raw.match(/(?:🀄.?|胡)\s*(.*?)(?:\(我\))?\s*胡\s*(.*?)(?:\(我\))?\s*(\d+)台/u);
+    const rec = {jiang:currJiang, circle:currCircle, dealer:dealerIdx, streak, shanten:null};
+    if (smSd){
+      const wi = names.indexOf(smSd[1].trim());
+      if (wi<0) return;
+      rec.type='tsumo'; rec.winner=wi; rec.loser=null; rec.tai=parseInt(smSd[2],10);
+    } else if (smRon){
+      const wi = names.indexOf(smRon[1].trim()), li = names.indexOf(smRon[2].trim());
+      if (wi<0 || li<0) return;
+      rec.type='ron'; rec.winner=wi; rec.loser=li; rec.tai=parseInt(smRon[3],10);
+    } else if (raw.includes('💨') || raw.includes('臭連')){
+      rec.type='draw'; rec.winner='draw'; rec.loser=null; rec.tai=0;
+    } else return;
+    log.push(rec);
+  });
+  return log;
+}
+
+function importFromSaveCode(text){
+  const saveData = parseSaveCodeText(text);
+  if (!saveData) return null;
+  const pStats = [0,1,2,3].map(i => saveData.p_stats[String(i)]);
+  const roundLog = (saveData.round_log && saveData.round_log.length>=0 && Array.isArray(saveData.round_log))
+    ? saveData.round_log
+    : legacyRoundLogFromHistory(saveData.history||[], saveData.names, saveData.my_seat||0);
+  return {
+    names: saveData.names, pStats, stats: saveData.stats, tableStats: saveData.table_stats,
+    shantenStats: saveData.shanten_stats, roundLog,
+    chips: saveData.chips, base: saveData.base, tai: saveData.tai,
+    jiang: saveData.jiang, round: saveData.round, dealer: saveData.dealer,
+    streak: saveData.streak, track: saveData.track,
+  };
+}
+
+function stripLeadingRankMark(s){ return s.replace(/^[🔥2️⃣3️⃣😭👤👑\s]+/, ''); }
+
+function parseStatBlockText(text, statName){
+  const headerRe = new RegExp(`(?:🌟|🀄.?|💸|💥)\\s*${statName}\\s*(\\d+)\\s*次\\s*([+-]?\\d+)\\s*元`, 'u');
+  const m = text.match(headerRe);
+  if (!m) return {count:0, money:0, records:[]};
+  const count = parseInt(m[1],10), money = parseInt(m[2],10);
+  const records = [];
+  if (count>0){
+    let inBlock=false;
+    text.split('\n').forEach(line=>{
+      if (headerRe.test(line)){ inBlock=true; return; }
+      if (inBlock){
+        if (line.trim().startsWith('└─')){
+          const rm = line.match(/└─\s*(.*?)台\s*([+-]?\d+)\s*元\s*(.*)/u);
+          if (rm) records.push({tai:parseInt(rm[1],10)||0, money:parseInt(rm[2],10)||0, context:(rm[3]||'').trim()});
+        } else if (line.trim() && !line.includes('└─')){ inBlock=false; }
+      }
+    });
+  }
+  return {count, money, records};
+}
+
+// ============================================================
+// 即時狀態 → 戰報頁面的 DATA 格式（讓記分畫面跟戰報畫面共用同一套渲染程式碼）
+// ============================================================
+function buildLiveData(state){
+  const typeMap = {ron:0, tsumo:1, draw:2};
+  const rows = state.roundLog.map(rec => [
+    rec.jiang, rec.circle, rec.dealer, rec.streak, typeMap[rec.type],
+    rec.type==='draw' ? null : rec.winner, rec.loser, rec.tai, rec.shanten
+  ]);
+
+  const { points, series } = getProfitOverRoundsLocal(state.roundLog, state.baseScore, state.taiScore, state.startingChips);
+  const isMultiJiang = points.some(p => p.jiang !== null && p.jiang > 0);
+  const trendAll = {
+    labels: buildTrendXLabelsLocal(points, !isMultiJiang, isMultiJiang ? 'jiang' : 'circle'),
+    series,
+  };
+  const jiangValues = [...new Set(points.filter(p=>p.jiang!==null).map(p=>p.jiang))].sort((a,b)=>a-b);
+  const trendByJiang = {};
+  jiangValues.forEach(j=>{
+    const idxs = []; points.forEach((p,i)=>{ if (p.jiang===j) idxs.push(i); });
+    if (!idxs.length) return;
+    const start = Math.max(0, idxs[0]-1), end = idxs[idxs.length-1]+1;
+    const subPoints = points.slice(start, end);
+    trendByJiang[String(j)] = {
+      labels: buildTrendXLabelsLocal(subPoints, true, 'circle'),
+      series: series.map(s => s.slice(start, end)),
+    };
+  });
+
+  return {
+    v:1, my: state.mySeat, chips: state.startingChips, base: state.baseScore, tai: state.taiScore,
+    names: state.names, dealerNow: state.dealerIdx,
+    p: state.pStats.map(p => [p.money, p.sd, p.win, p.dealin, p.sd_other]),
+    final: state.isFinal, track: state.trackShanten,
+    prog: buildProgressString(state), tr: state.tableStats.total_rounds, trimmed: false,
+    r: rows, trendAll, trendByJiang,
+  };
+}
+
+function getProfitOverRoundsLocal(roundLog, base, taiScore, chips){
+  const profits = [0,0,0,0];
+  const points = [{jiang:null, circle:null, is_start:true, profits:[0,0,0,0]}];
+  let currentPhase = null;
+  roundLog.forEach(rec=>{
+    const phase = `${rec.jiang}-${rec.circle}-${rec.dealer}`;
+    if (currentPhase!==null && phase!==currentPhase.key){
+      points.push({jiang:currentPhase.jiang, circle:currentPhase.circle, is_start:false, profits:[...profits]});
+    }
+    currentPhase = {key:phase, jiang:rec.jiang, circle:rec.circle};
+    const d = computeDeltas({type: rec.type==='draw'?TYPE_DRAW:(rec.type==='tsumo'?TYPE_TSUMO:TYPE_RON),
+                              winner:rec.winner, loser:rec.loser, tai:rec.tai, dealer:rec.dealer, streak:rec.streak}, base, taiScore);
+    for (let i=0;i<4;i++) profits[i]+=d[i];
+  });
+  if (currentPhase!==null) points.push({jiang:currentPhase.jiang, circle:currentPhase.circle, is_start:false, profits:[...profits]});
+  const series = [0,1,2,3].map(i => points.map(p => chips + p.profits[i]));
+  return {points, series};
+}
+
+function buildTrendXLabelsLocal(points, isSingleJiangView, mode){
+  mode = mode || 'dense';
+  if (mode==='dense'){
+    const labels=[]; let lastCircle=null, pos=0;
+    points.forEach((pt,idx)=>{
+      if (pt.is_start || idx===0){ labels.push(pt.is_start?'開局':'將初'); lastCircle=pt.circle; pos=0; return; }
+      if (pt.circle!==lastCircle){ pos=0; lastCircle=pt.circle; }
+      labels.push(pos===0 ? `${WINDS[pt.circle]}風東` : WINDS[pos]); pos++;
+    });
+    return labels;
+  }
+  if (mode==='jiang'){
+    const n=points.length;
+    return points.map((pt,idx)=>{
+      if (pt.is_start||idx===0) return pt.is_start?'開局':'將初';
+      const isEnd = (idx===n-1) || (points[idx+1].jiang!==pt.jiang);
+      return isEnd ? `第${pt.jiang+1}將` : '';
+    });
+  }
+  const n=points.length;
+  return points.map((pt,idx)=>{
+    if (pt.is_start||idx===0) return pt.is_start?'開局':'將初';
+    const isEnd = (idx===n-1) || (points[idx+1].circle!==pt.circle) || (points[idx+1].jiang!==pt.jiang);
+    if (!isEnd) return '';
+    if (!isSingleJiangView && pt.circle===0) return `第${pt.jiang+1}將${WINDS[pt.circle]}`;
+    return WINDS[pt.circle];
+  });
+}
+
+function buildProgressString(state){
+  const j = state.jiangCount, r = state.roundIdx, d = state.dealerIdx;
+  if (state.isFinal && r===0 && d===0 && state.streak===0 && j>0 && state.roundLog.length>0){
+    return `第${j}將 結束`;
+  }
+  return `第${j+1}將 ${WINDS[r]}風${WINDS[d]}局`;
+}
+
+// ============================================================
+// 本機儲存（相當於「自動存檔」）：關掉網頁重開會自動接續打到一半的進度
+// ============================================================
+const LIVE_STORAGE_KEY = 'mahjong_live_state_v1';
+function saveLiveState(state){
+  try { localStorage.setItem(LIVE_STORAGE_KEY, JSON.stringify(state)); } catch(e){ console.warn('本機儲存失敗', e); }
+}
+function loadLiveState(){
+  try {
+    const raw = localStorage.getItem(LIVE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+function clearLiveState(){
+  try { localStorage.removeItem(LIVE_STORAGE_KEY); } catch(e){}
+}
+
+// ============================================================
+// 設定精靈（新局：兩段式取名 —— 先取名，再依 東→南→西→北 順序指定風位；
+//              或戰報匯入：貼存檔碼／舊版純文字戰報，一樣走風位指定流程）
+// ============================================================
+function sanitizeNameJS(raw, seatIdx, namesArr){
+  const div = document.createElement('div'); div.textContent = (raw||'').trim().slice(0,6);
+  const name = div.innerHTML; // 借用瀏覽器原生轉義，等同 Python 的 html.escape
+  if (!name) return {name:null, err:'名稱不可空白，請重新輸入'};
+  for (let i=0;i<namesArr.length;i++){
+    if (i!==seatIdx && namesArr[i]===name) return {name:null, err:`名稱「${name}」已經被其他玩家使用，請換一個`};
+  }
+  return {name, err:null};
+}
+
+let wiz = {
+  step: 'welcome', mode: 'new',
+  tempNames: ['','','',''],
+  importedNames: [], importedData: null, importKind: null, // 'save' | 'plain'
+  windAssign: [null,null,null,null], remainingNames: [],
+  chips: 0, base: 100, tai: 20, trackShanten: false,
+  error: '',
+};
+
+function wizGoto(step){ wiz.step = step; wiz.error=''; renderWizard(); }
+
+function renderWizard(){
+  const el = document.getElementById('setup-wizard');
+  el.innerHTML = '';
+  document.getElementById('live-title').textContent = '設定新局';
+  document.getElementById('live-progress').textContent = '';
+
+  const errBox = () => wiz.error ? `<div class="wiz-error">⚠️ ${wiz.error}</div>` : '';
+
+  if (wiz.step === 'welcome'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">要開始新的一局，還是接續之前的戰報？</div>
+        <button class="wiz-primary-btn" id="btn-new">🆕 開始新局</button>
+        <button class="wiz-secondary-btn" id="btn-import">📥 戰報匯入（貼存檔碼或舊戰報文字）</button>
+      </div>`;
+    document.getElementById('btn-new').onclick = () => { wiz.mode='new'; wizGoto('chips'); };
+    document.getElementById('btn-import').onclick = () => { wiz.mode='import'; wizGoto('import_paste'); };
+    return;
+  }
+
+  if (wiz.step === 'import_paste'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">貼上存檔碼（[SaveCodeV2]...[/SaveCodeV2]）或舊版戰報文字：</div>
+        <textarea class="wiz-textarea" id="import-text" placeholder="貼在這裡…"></textarea>
+        ${errBox()}
+        <button class="wiz-primary-btn" id="btn-parse">解析</button>
+        <button class="wiz-secondary-btn" id="btn-back">⬅️ 返回</button>
+      </div>`;
+    document.getElementById('btn-parse').onclick = () => {
+      const text = document.getElementById('import-text').value.trim();
+      if (!text){ wiz.error='請先貼上內容'; renderWizard(); return; }
+      let data = importFromSaveCode(text);
+      if (data){
+        wiz.importKind = 'save';
+        wiz.importedData = data;
+        wiz.importedNames = data.names.slice();
+      } else {
+        const plain = importFromPlainReport(text);
+        if (!plain){ wiz.error='看不懂這段內容，請確認是完整複製存檔碼或戰報文字'; renderWizard(); return; }
+        wiz.importKind = 'plain';
+        wiz.importedData = plain;
+        wiz.importedNames = plain.names.slice();
+      }
+      wiz.remainingNames = wiz.importedNames.slice();
+      wiz.windAssign = [null,null,null,null];
+      wizGoto('wind_0');
+    };
+    document.getElementById('btn-back').onclick = () => wizGoto('welcome');
+    return;
+  }
+
+  if (wiz.step === 'chips'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">起始籌碼</div>
+        <div class="wiz-grid">
+          <button class="wiz-btn" data-v="0">0（純記輸贏）</button>
+          <button class="wiz-btn" data-v="30000">30,000</button>
+        </div>
+        <input class="wiz-input" id="chips-custom" type="number" placeholder="或輸入自訂數字" style="margin-top:8px;">
+        <button class="wiz-primary-btn" id="btn-chips-next">下一步</button>
+      </div>`;
+    el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
+      wiz.chips = parseInt(b.dataset.v, 10);
+      wizGoto('stake');
+    });
+    document.getElementById('btn-chips-next').onclick = () => {
+      const v = parseInt(document.getElementById('chips-custom').value, 10);
+      wiz.chips = isNaN(v) ? 0 : v;
+      wizGoto('stake');
+    };
+    return;
+  }
+
+  if (wiz.step === 'stake'){
+    const presets = [[30,10],[50,10],[100,20],[1000,200]];
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">台底設定（底/台）</div>
+        <div class="wiz-grid">
+          ${presets.map(([b,t]) => `<button class="wiz-btn" data-b="${b}" data-t="${t}">${b}/${t}</button>`).join('')}
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <input class="wiz-input" id="stake-base" type="number" placeholder="底" style="margin-bottom:0;">
+          <input class="wiz-input" id="stake-tai" type="number" placeholder="台" style="margin-bottom:0;">
+        </div>
+        <button class="wiz-primary-btn" id="btn-stake-next">下一步</button>
+      </div>`;
+    el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
+      wiz.base = parseInt(b.dataset.b,10); wiz.tai = parseInt(b.dataset.t,10);
+      wizGoto('shanten_toggle');
+    });
+    document.getElementById('btn-stake-next').onclick = () => {
+      const b = parseInt(document.getElementById('stake-base').value,10);
+      const t = parseInt(document.getElementById('stake-tai').value,10);
+      if (!isNaN(b)) wiz.base = b;
+      if (!isNaN(t)) wiz.tai = t;
+      wizGoto('shanten_toggle');
+    };
+    return;
+  }
+
+  if (wiz.step === 'shanten_toggle'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">要追蹤聽牌率嗎？（放槍時會多問一句目前是不是聽牌）</div>
+        <div class="wiz-grid">
+          <button class="wiz-btn" data-v="1">✅ 開啟</button>
+          <button class="wiz-btn" data-v="0">關閉</button>
+        </div>
+      </div>`;
+    el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
+      wiz.trackShanten = b.dataset.v === '1';
+      wizGoto('names');
+    });
+    return;
+  }
+
+  if (wiz.step === 'names'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">先輸入四位玩家的名字（還不用管誰坐哪一家）</div>
+        ${[0,1,2,3].map(i => `<input class="wiz-input" id="name-${i}" placeholder="玩家 ${i+1}" maxlength="6" value="${wiz.tempNames[i]||''}">`).join('')}
+        ${errBox()}
+        <button class="wiz-primary-btn" id="btn-names-next">下一步：抓位</button>
+      </div>`;
+    document.getElementById('btn-names-next').onclick = () => {
+      const vals = [0,1,2,3].map(i => document.getElementById(`name-${i}`).value);
+      const cleaned = [];
+      for (let i=0;i<4;i++){
+        const {name, err} = sanitizeNameJS(vals[i], i, cleaned);
+        if (err){ wiz.tempNames = vals; wiz.error = `第 ${i+1} 位：${err}`; renderWizard(); return; }
+        cleaned.push(name);
+      }
+      wiz.tempNames = cleaned;
+      wiz.remainingNames = cleaned.slice();
+      wiz.windAssign = [null,null,null,null];
+      wizGoto('wind_0');
+    };
+    return;
+  }
+
+  if (wiz.step.startsWith('wind_')){
+    const windIdx = parseInt(wiz.step.split('_')[1], 10);
+    const windLabel = WINDS[windIdx];
+
+    if (windIdx === 3 && wiz.remainingNames.length === 1){
+      // 最後一位自動帶入，只需確認
+      el.innerHTML = `
+        <div class="wiz-step">
+          <div class="wiz-label">最後一位自動歸為「${windLabel}」風位：</div>
+          <div class="wiz-hint-card form-hint-card">${wiz.remainingNames[0]}</div>
+          <button class="wiz-primary-btn" id="btn-confirm-last">確認</button>
+        </div>`;
+      document.getElementById('btn-confirm-last').onclick = () => {
+        wiz.windAssign[3] = wiz.remainingNames[0];
+        wizGoto('my_seat');
+      };
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">${windLabel}風位是誰？</div>
+        <div class="wiz-grid">
+          ${wiz.remainingNames.map(n => `<button class="wiz-btn" data-n="${n}">${n}</button>`).join('')}
+        </div>
+      </div>`;
+    el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
+      const n = b.dataset.n;
+      wiz.windAssign[windIdx] = n;
+      wiz.remainingNames = wiz.remainingNames.filter(x => x !== n);
+      wizGoto(windIdx < 3 ? `wind_${windIdx+1}` : 'my_seat');
+    });
+    return;
+  }
+
+  if (wiz.step === 'my_seat'){
+    el.innerHTML = `
+      <div class="wiz-step">
+        <div class="wiz-label">你是哪一位？</div>
+        <div class="wiz-grid">
+          ${wiz.windAssign.map((n,i) => `<button class="wiz-btn" data-i="${i}">${WINDS[i]}：${n}</button>`).join('')}
+        </div>
+      </div>`;
+    el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
+      finalizeSetup(parseInt(b.dataset.i,10));
+    });
+    return;
+  }
+}
+
+function finalizeSetup(mySeat){
+  let state = initGameState();
+  state.names = wiz.windAssign.slice();
+  state.mySeat = mySeat;
+
+  if (wiz.mode === 'new'){
+    state.startingChips = wiz.chips;
+    state.baseScore = wiz.base;
+    state.taiScore = wiz.tai;
+    state.trackShanten = wiz.trackShanten;
+  } else {
+    // 引繼匯入：把舊資料依照 windAssign（名字→新座位）重新對應
+    const d = wiz.importedData;
+    const nameToNewSeat = {};
+    wiz.windAssign.forEach((name, newSeat) => { nameToNewSeat[name] = newSeat; });
+
+    state.startingChips = 0;
+    state.baseScore = d.base;
+    state.taiScore = d.tai;
+    state.trackShanten = !!d.track;
+    state.jiangCount = d.jiang || 0;
+    state.roundIdx = d.round || 0;
+    state.dealerIdx = d.dealer || 0;
+    state.streak = d.streak || 0;
+    state.tableStats = d.tableStats || {total_rounds:0};
+    state.shantenStats = d.shantenStats || state.shantenStats;
+
+    if (wiz.importKind === 'save'){
+      // pStats/roundLog 用的是「舊座位編號」，直接用 舊索引→名字→新座位 做轉換
+      const oldIdxToNewSeat = {};
+      d.names.forEach((name, oldIdx) => { oldIdxToNewSeat[oldIdx] = nameToNewSeat[name]; });
+      const newPStats = [0,1,2,3].map(()=>({sd:0,win:0,dealin:0,sd_other:0,money:0}));
+      d.pStats.forEach((p, oldIdx) => { newPStats[oldIdxToNewSeat[oldIdx]] = p; });
+      state.pStats = newPStats;
+      state.stats = d.stats;
+      state.roundLog = d.roundLog.map(rec => ({
+        ...rec,
+        dealer: oldIdxToNewSeat[rec.dealer],
+        winner: (rec.winner==='draw'||rec.winner===null) ? rec.winner : oldIdxToNewSeat[rec.winner],
+        loser: rec.loser===null||rec.loser===undefined ? null : oldIdxToNewSeat[rec.loser],
+      }));
+    } else {
+      // 純文字戰報：importData 是 [name, money, sd, win, dealin, sdOther]（舊局排序，不一定是座位順序）
+      const newPStats = [0,1,2,3].map(()=>({sd:0,win:0,dealin:0,sd_other:0,money:0}));
+      d.importData.forEach(row => {
+        const newSeat = nameToNewSeat[row[0]];
+        if (newSeat===undefined) return;
+        newPStats[newSeat] = {
+          money: parseInt(row[1],10) || 0, sd: parseInt(row[2],10)||0, win: parseInt(row[3],10)||0,
+          dealin: parseInt(row[4],10)||0, sd_other: parseInt(row[5],10)||0,
+        };
+      });
+      state.pStats = newPStats;
+      state.stats = d.stats;
+      state.roundLog = d.roundLog.map(rec => ({
+        ...rec,
+        dealer: nameToNewSeat[wiz.importedNames[rec.dealer]] ?? rec.dealer,
+        winner: (rec.winner==='draw'||rec.winner===null) ? rec.winner : (nameToNewSeat[wiz.importedNames[rec.winner]] ?? rec.winner),
+        loser: (rec.loser===null||rec.loser===undefined) ? null : (nameToNewSeat[wiz.importedNames[rec.loser]] ?? rec.loser),
+      }));
+    }
+  }
+
+  liveState = state;
+  saveLiveState(liveState);
+  showScoringApp();
+}
+
+function importFromPlainReport(text){
+  let raw = [...text.matchAll(/\[(.*?)\] 💰 ([+-]?\d+)\s*元\n└\s*自摸\s*(\d+)\s*次[\s\S]*?胡牌\s*(\d+)\s*次[\s\S]*?放槍\s*(\d+)\s*次[\s\S]*?被摸\s*(\d+)\s*次/gu)];
+  if (raw.length !== 4){
+    raw = [...text.matchAll(/\[(.*?)\] 💰 ([+-]?\d+)\s*元/gu)];
+    if (raw.length !== 4) return null;
+  }
+  const stakeM = text.match(/底台：(\d+)\/(\d+)/);
+  const base = stakeM ? parseInt(stakeM[1],10) : 30;
+  const tai = stakeM ? parseInt(stakeM[2],10) : 10;
+  const cleanedPlayers = raw.map(p => [stripLeadingRankMark(p[1]).trim(), p[2], p[3], p[4], p[5], p[6]]);
+  const names = cleanedPlayers.map(p => p[0]);
+
+  let jiangCount=0, roundIdx=0, dealerIdx=0;
+  const trM = text.match(/共打了 (\d+) 局/);
+  const totalRounds = trM ? parseInt(trM[1],10) : 0;
+  const progM = text.match(/進度：(?:第(\d+)將\s*)?(東|南|西|北)風([東南西北])局/);
+  if (progM){
+    if (progM[1]) jiangCount = parseInt(progM[1],10)-1;
+    roundIdx = WINDS.indexOf(progM[2]); dealerIdx = WINDS.indexOf(progM[3]);
+  } else if (text.includes('結束')){
+    const endM = text.match(/第(\d+)將 結束/);
+    if (endM){ jiangCount = parseInt(endM[1],10); roundIdx=0; dealerIdx=0; }
+  }
+
+  let roundLog = [], streak = 0;
+  let histM = text.match(/明細：\s*([\s\S]*?)\s*━━━━━━━━━━━━━━━━━━/);
+  if (!histM) histM = text.match(/明細：\s*([\s\S]*?)\s*🎯/);
+  if (histM){
+    const historyTuples = [];
+    const validLines = histM[1].trim().split('\n').map(l=>l.trim()).filter(l=>l && !/^[━─┈]+$/.test(l));
+    let currentRound = roundIdx;
+    validLines.forEach(line=>{
+      const circleM = line.match(/^(?:<[^>]+>)?(?:第(\d+)將\s*)?([東南西北])風圈/);
+      if (circleM){
+        currentRound = WINDS.indexOf(circleM[2]);
+        historyTuples.push([-1, `<b>${line.replace(/<\/?b>/g,'')}</b>`]);
+      } else historyTuples.push([currentRound, line]);
+    });
+    roundLog = legacyRoundLogFromHistory(historyTuples, names, 0);
+    if (validLines.length>0){
+      const lastLine = validLines[validLines.length-1];
+      const sm = lastLine.match(/連(\d+)/);
+      if (sm) streak = parseInt(sm[1],10);
+      else { const nextM = text.match(/進入下一局：[\s\S]*?連莊\s*(\d+)/); streak = nextM ? parseInt(nextM[1],10) : 0; }
+    }
+  }
+
+  let shantenStats = {'0':0,'1':0,away:0,notready:0,tracked_rounds:0};
+  const shM = text.match(/聽牌(\d+)次(?:\(([\d.]+)%\))?/);
+  if (shM){
+    shantenStats['0'] = parseInt(shM[1],10);
+    if (shM[2]){ const pct=parseFloat(shM[2]); shantenStats.tracked_rounds = pct>0 ? Math.round(shantenStats['0']/(pct/100)) : 0; }
+  }
+  const stats = {
+    sd_me: parseStatBlockText(text,'自摸'), win: parseStatBlockText(text,'胡牌'),
+    dealin: parseStatBlockText(text,'放槍'), sd_other: parseStatBlockText(text,'被摸'),
+  };
+  return {
+    names, importData: cleanedPlayers, base, tai, chips:0,
+    jiang: jiangCount, round: roundIdx, dealer: dealerIdx, streak,
+    tableStats: {total_rounds: totalRounds}, shantenStats, stats, roundLog,
+  };
+}
+
+
+// ============================================================
+// 記分表單（即時模式）—— 三排同時顯示、順序不限、選滿自動送出，
+// 版面配置沿用 Telegram Bot 已確認過的設計：「我」固定左下、皇冠標示、
+// 逆時針排列（左上=上家、右上=對家、左下=我、右下=下家）。
+// ============================================================
+let liveState = null;
+let liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
+let liveTaiPage = 0;
+
+function showScoringApp(){
+  document.getElementById('setup-wizard').style.display = 'none';
+  document.getElementById('scoring-app').style.display = '';
+  document.getElementById('live-title').textContent = '即時計分';
+  liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
+  liveTaiPage = 0;
+  renderLiveApp();
+}
+
+function liveFormNeedsShanten(){
+  const f = liveForm, track = liveState.trackShanten;
+  if (f.winner === 'draw') return track;
+  if (f.winner === null) return false;
+  if (f.winner === liveState.mySeat) return false;
+  return track || f.loser === liveState.mySeat;
+}
+function liveFormMissing(){
+  const f = liveForm; const missing = [];
+  if (f.winner === null) missing.push('winner');
+  if (f.winner !== 'draw'){
+    if (f.type === null || (f.type==='ron' && f.loser===null)) missing.push('loser');
+    if (f.tai === null) missing.push('tai');
+  }
+  if (liveFormNeedsShanten() && f.shanten === null) missing.push('shanten');
+  return missing;
+}
+
+function trySubmitLiveForm(){
+  if (liveFormMissing().length) { renderLiveApp(); return; }
+  if (liveForm.shanten === null){
+    liveForm.shanten = (liveForm.winner !== 'draw' && liveForm.winner === liveState.mySeat) ? '0' : null;
+  }
+  const { state, jiangFinished } = engineExecuteSubmit(liveState, liveForm);
+  liveState = state;
+  liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
+  liveTaiPage = 0;
+  saveLiveState(liveState);
+  renderLiveApp();
+  if (jiangFinished) showSaveCodePanel('🏁 這將結束了！自動產生存檔碼：');
+}
+
+function renderLiveApp(){
+  refreshReportFromData(buildLiveData(liveState));
+  document.getElementById('live-progress').textContent = buildProgressString(liveState) +
+    (liveState.isFinal ? '（已結算）' : '');
+  renderLivePlayers();
+  if (liveState.isFinal){
+    renderFinalPanel();
+  } else {
+    renderLiveForm();
+  }
+}
+
+function renderLivePlayers(){
+  const wrap = document.getElementById('live-players');
+  wrap.innerHTML = '';
+  const order = [0,1,2,3].slice().sort((a,b)=> liveState.pStats[b].money - liveState.pStats[a].money);
+  order.forEach((seat, rank) => {
+    const p = liveState.pStats[seat];
+    const money = liveState.startingChips + p.money;
+    const div = document.createElement('div');
+    div.className = 'p-card';
+    div.style.setProperty('--accent', suitColor(seat));
+    div.innerHTML = `
+      <div class="p-tile">${WINDS[seat]}</div>
+      <div class="p-name">${liveState.names[seat]}${seat===liveState.mySeat? '<span class="me-mark">（我）</span>':''}</div>
+      <div class="p-rank">${['🥇 第1名','🥈 第2名','🥉 第3名','😭 第4名'][rank]}${seat===liveState.dealerIdx? '・莊':''}</div>
+      <div class="p-money num" style="color:${suitColor(seat)}">${fmtSigned(money)}</div>
+      <div class="p-sub">自摸${p.sd} 胡${p.win} 放槍${p.dealin} 被摸${p.sd_other}</div>
+    `;
+    wrap.appendChild(div);
+  });
+}
+
+function playerLabelLive(i, selected, disabledReason){
+  const my = liveState.mySeat;
+  const relName = i===my ? '我' : (['','下家','對家','上家'][(i-my+4)%4]);
+  const dealerStr = i===liveState.dealerIdx ? '莊' : '';
+  const base = `${relName}(${liveState.names[i]}${dealerStr})`.trim();
+  if (disabledReason) return `🚫 ${base}`;
+  let mark;
+  if (selected) mark = '✅';
+  else if (i===my) mark = '👑';
+  else mark = ['🀀','🀁','🀂','🀃'][i];
+  return `${mark} ${base}`;
+}
+
+function renderLiveForm(){
+  const el = document.getElementById('live-form-wrap');
+  const f = liveForm, missing = liveFormMissing();
+  const my = liveState.mySeat;
+  const shimo=(my+1)%4, toi=(my+2)%4, kami=(my+3)%4;
+  const order = [kami, toi, my, shimo];
+
+  let html = '';
+
+  const parts = [];
+  if (f.winner==='draw') parts.push('💨 臭連');
+  else if (f.winner!==null) parts.push(`🀄 ${playerLabelLive(f.winner,false).split(' ').slice(1).join(' ')} 胡`);
+  if (f.type==='tsumo') parts.push('🌟 自摸');
+  else if (f.type==='ron' && f.loser!==null) parts.push(`👉 ${liveState.names[f.loser]} 放槍`);
+  if (f.tai!==null) parts.push(`${f.tai}台`);
+  if (f.shanten!==null) parts.push(SHANTEN_NAMES[String(f.shanten)]||'');
+  html += `<div class="form-hint-card">${parts.length ? '📝 目前選擇：<b>'+parts.join('　')+'</b>' : '📝 請直接點選（順序不限，選滿自動記錄）'}</div>`;
+
+  html += `<div class="form-section-title">① 誰胡牌${missing.includes('winner')?'':' ✅'}</div>`;
+  html += `<div class="form-grid2">` + order.map(i =>
+    `<button class="form-pbtn ${f.winner===i?'selected':''}" data-act="w" data-i="${i}">${playerLabelLive(i, f.winner===i)}</button>`
+  ).join('') + `</div>`;
+  html += `<button class="form-wide-btn ${f.winner==='draw'?'selected':''}" data-act="w" data-i="draw">💨 臭連（流局）</button>`;
+
+  if (f.winner !== 'draw'){
+    html += `<div class="form-section-title">② 誰放槍／自摸${missing.includes('loser')?'':' ✅'}</div>`;
+    html += `<div class="form-grid2">` + order.map(i => {
+      if (f.winner!==null && i===f.winner) return `<button class="form-pbtn disabled" disabled>${playerLabelLive(i,false,'已胡')}</button>`;
+      const sel = f.type==='ron' && f.loser===i;
+      return `<button class="form-pbtn ${sel?'selected':''}" data-act="l" data-i="${i}">${playerLabelLive(i, sel)}</button>`;
+    }).join('') + `</div>`;
+    html += `<button class="form-wide-btn ${f.type==='tsumo'?'selected':''}" data-act="l" data-i="tsumo">🌟 這是自摸！</button>`;
+
+    html += `<div class="form-section-title">③ 幾台${f.tai===null?'':` ✅ 目前：${f.tai}台`}</div>`;
+    const lo = liveTaiPage===0 ? 0 : 11, hi = liveTaiPage===0 ? 11 : 21;
+    const nums = []; for (let n=lo;n<hi;n++) nums.push(n);
+    html += `<div class="form-tai-grid">` + nums.map(n =>
+      `<button class="form-tai-btn ${f.tai===n?'selected':''}" data-act="tai" data-i="${n}">${n}</button>`
+    ).join('') + `</div>`;
+    html += `<div class="form-sys-row">
+      <button data-act="taipage" data-i="${liveTaiPage===0?1:0}">${liveTaiPage===0?'11～20 台 ▸':'◂ 0～10 台'}</button>
+      <button data-act="taimanual">✏️ 手動輸入</button>
+    </div>`;
+  }
+
+  if (liveFormNeedsShanten()){
+    html += `<div class="form-section-title">④ 你的聽牌狀況${f.shanten===null?'':' ✅'}</div>`;
+    const opts = (f.loser===liveState.mySeat) ? [['0','🎯 聽牌'],['1','⚡ 1進聽'],['away','💨 走遠了']] : [['0','🎯 聽牌'],['notready','💤 沒聽牌']];
+    html += `<div class="form-grid2">` + opts.map(([k,label]) =>
+      `<button class="form-pbtn ${f.shanten===k?'selected':''}" data-act="shanten" data-i="${k}">${label}</button>`
+    ).join('') + `</div>`;
+  }
+
+  html += `<div class="form-sys-row">
+    <button data-act="clear">🧹 清除重選</button>
+    <button data-act="undo" ${liveState.undoStack.length? '' : 'disabled'}>${liveState.undoStack.length?'⬅️ 撤銷上一局':'🚫 無法撤銷'}</button>
+  </div>
+  <div class="form-sys-row">
+    <button data-act="finalize">🛑 提前結算</button>
+  </div>`;
+
+  el.innerHTML = html;
+  el.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', () => handleLiveFormAction(btn.dataset.act, btn.dataset.i)));
+}
+
+function handleLiveFormAction(act, i){
+  if (act === 'w'){
+    if (i === 'draw'){
+      liveForm = {winner:'draw', type:null, loser:null, tai:null, shanten:null};
+    } else {
+      const newW = parseInt(i,10);
+      liveForm.winner = newW;
+      if (liveForm.loser === newW){ liveForm.loser=null; liveForm.type=null; }
+      liveForm.shanten = null;
+    }
+    trySubmitLiveForm();
+  } else if (act === 'l'){
+    if (i === 'tsumo'){ liveForm.type='tsumo'; liveForm.loser=null; }
+    else {
+      const l = parseInt(i,10);
+      if (liveForm.winner === l){ alert('胡牌者不能同時是放槍者'); return; }
+      liveForm.type='ron'; liveForm.loser=l;
+    }
+    liveForm.shanten = null;
+    trySubmitLiveForm();
+  } else if (act === 'tai'){
+    liveForm.tai = parseInt(i,10);
+    trySubmitLiveForm();
+  } else if (act === 'shanten'){
+    liveForm.shanten = i;
+    trySubmitLiveForm();
+  } else if (act === 'taipage'){
+    liveTaiPage = parseInt(i,10);
+    renderLiveForm();
+  } else if (act === 'taimanual'){
+    const v = prompt('請輸入台數（0～999 的整數）：');
+    if (v===null) return;
+    const n = parseInt(v,10);
+    if (isNaN(n) || n<0 || n>999){ alert('請輸入 0～999 的整數'); return; }
+    liveForm.tai = n;
+    trySubmitLiveForm();
+  } else if (act === 'clear'){
+    liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
+    renderLiveForm();
+  } else if (act === 'undo'){
+    liveState = engineUndo(liveState);
+    saveLiveState(liveState);
+    renderLiveApp();
+  } else if (act === 'finalize'){
+    if (confirm('確定要提前結算嗎？結算後可以在下方撤銷回到牌局。')){
+      liveState.isFinal = true;
+      saveLiveState(liveState);
+      renderLiveApp();
+      showSaveCodePanel('🛑 已提前結算，存檔碼：');
+    }
+  }
+}
+
+function renderFinalPanel(){
+  const el = document.getElementById('live-form-wrap');
+  el.innerHTML = `
+    <div class="form-hint-card">🏁 本局已結算。</div>
+    <div class="form-sys-row">
+      <button data-act="undo-final">↩️ 撤銷結算（回到牌局）</button>
+    </div>
+    <div class="form-sys-row">
+      <button data-act="show-savecode">💾 顯示存檔碼</button>
+      <button data-act="new-game">🆕 開始新局</button>
+    </div>
+    <div id="savecode-panel"></div>`;
+  el.querySelector('[data-act="undo-final"]').onclick = () => {
+    liveState.isFinal = false; saveLiveState(liveState); renderLiveApp();
+  };
+  el.querySelector('[data-act="show-savecode"]').onclick = () => showSaveCodePanel('💾 存檔碼：');
+  el.querySelector('[data-act="new-game"]').onclick = () => {
+    if (confirm('確定要開始新的一局嗎？目前這局的存檔碼記得先保存喔。')){
+      clearLiveState();
+      wiz = {step:'welcome', mode:'new', tempNames:['','','',''], importedNames:[], importedData:null,
+             importKind:null, windAssign:[null,null,null,null], remainingNames:[], chips:0, base:100, tai:20,
+             trackShanten:false, error:''};
+      document.getElementById('setup-wizard').style.display = '';
+      document.getElementById('scoring-app').style.display = 'none';
+      renderWizard();
+    }
+  };
+}
+
+function showSaveCodePanel(title){
+  const code = generateSaveCodeText(liveState);
+  let panel = document.getElementById('savecode-panel');
+  if (!panel){
+    panel = document.createElement('div');
+    panel.id = 'savecode-panel';
+    document.getElementById('live-form-wrap').appendChild(panel);
+  }
+  panel.innerHTML = `
+    <div class="form-hint-card">
+      ${title}
+      <div class="savecode-box">${code}</div>
+      <button class="wiz-primary-btn" id="btn-send-bot">📤 傳回 Telegram 聊天室</button>
+      <button class="wiz-secondary-btn" id="btn-copy-code">📋 複製存檔碼</button>
+    </div>`;
+  document.getElementById('btn-send-bot').onclick = () => {
+    if (tg && tg.sendData){
+      try { tg.sendData(code); }
+      catch(e){ alert('無法傳回聊天室，請改用「複製存檔碼」手動貼上。'); }
+    } else {
+      alert('目前無法直接傳回聊天室，請改用「複製存檔碼」手動貼上。');
+    }
+  };
+  document.getElementById('btn-copy-code').onclick = () => {
+    navigator.clipboard?.writeText(code).then(()=>alert('已複製存檔碼！')).catch(()=>alert('複製失敗，請手動選取文字複製。'));
+  };
+}
+
+document.querySelectorAll('#live-tabbar button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#live-tabbar button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const isScore = btn.dataset.liveTab === 'score';
+    document.getElementById('live-score-panel').style.display = isScore ? '' : 'none';
+    document.getElementById('live-report-panel').style.display = isScore ? 'none' : '';
+  });
+});
+
+function initLiveMode(){
+  document.getElementById('report-view').style.display = 'none';
+  document.getElementById('live-view').style.display = '';
+  const reportView = document.getElementById('report-view');
+  document.getElementById('live-report-panel').appendChild(reportView);
+  reportView.style.display = '';
+
+  const saved = loadLiveState();
+  if (saved){
+    liveState = saved;
+    document.getElementById('setup-wizard').style.display = 'none';
+    document.getElementById('scoring-app').style.display = '';
+    liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
+    renderLiveApp();
+  } else {
+    renderWizard();
+  }
+}
+
+if (DATA) {
+  renderAll();
+} else {
+  initLiveMode();
+}
 </script>
 </body>
 </html>
