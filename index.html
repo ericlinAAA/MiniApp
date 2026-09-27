@@ -982,7 +982,7 @@ function buildSaveDataObject(state){
   const pStatsObj = {};
   state.pStats.forEach((p,i)=>{ pStatsObj[String(i)] = p; });
   return {
-    v:3, start_time:state.startTime, chips:state.startingChips, base:state.baseScore, tai:state.taiScore,
+    v:3, start_time:state.startTime, end_time: state.endTime || null, chips:state.startingChips, base:state.baseScore, tai:state.taiScore,
     names:state.names, p_stats:pStatsObj, stats:state.stats, table_stats:state.tableStats,
     shanten_stats:state.shantenStats, history:[], round_log:state.roundLog, my_seat:state.mySeat,
     jiang:state.jiangCount, round:state.roundIdx, dealer:state.dealerIdx, streak:state.streak, track:state.trackShanten,
@@ -1524,6 +1524,10 @@ function finalizeSetup(mySeat){
     state.streak = d.streak || 0;
     state.tableStats = d.tableStats || {total_rounds:0};
     state.shantenStats = d.shantenStats || state.shantenStats;
+    // 💡 之前這裡完全沒還原開始時間：存檔碼裡明明有 start_time，卻只挑了統計數字回填，
+    //    導致繼續打之後時間變成「重新匯入的當下」而不是最初開局的時間。
+    if (d.start_time) state.startTime = d.start_time;
+    state.endTime = null; // 繼續進行中，視為尚未結束
 
     if (wiz.importKind === 'save'){
       // pStats/roundLog 用的是「舊座位編號」，直接用 舊索引→名字→新座位 做轉換
