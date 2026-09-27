@@ -515,7 +515,8 @@ function buildHandLine(rec, viewer){
       if (viewer === w){ involved=true; amtClass='plus'; amtText = '+'+amt; }
       else if (viewer === l){
         involved=true; amtClass='minus'; amtText = '-'+amt;
-        if (viewer === DATA.my && DATA.track && rec.shanten){
+        // 💡 只要有記到聽牌狀況就顯示，不受「追蹤聽牌」總開關影響（關閉追蹤時，放槍當下依然會問）
+        if (viewer === DATA.my && rec.shanten){
           body += `<span class="ctx-tag">${SHANTEN_NAMES[rec.shanten]||''}</span>`;
         }
       }
@@ -570,7 +571,7 @@ function renderStat(){
     } else {
       if (rec.winner === viewSeat) buckets.win.push({tai:rec.tai, money:deltas[viewSeat]});
       else if (rec.loser === viewSeat){
-        const ctx = (viewSeat===DATA.my && DATA.track && rec.shanten) ? (SHANTEN_NAMES[rec.shanten]||'') : '';
+        const ctx = (viewSeat===DATA.my && rec.shanten) ? (SHANTEN_NAMES[rec.shanten]||'') : '';
         buckets.dealin.push({tai:rec.tai, money:deltas[viewSeat], ctx});
       }
     }
@@ -1561,6 +1562,7 @@ function finalizeSetup(mySeat){
 
   liveState = state;
   saveLiveState(liveState);
+  viewSeat = mySeat; // 💡 預設展開「我」自己的每局明細，不用手動點選才看得到
   showScoringApp();
 }
 
@@ -1927,6 +1929,7 @@ function initLiveMode(){
   const saved = loadLiveState();
   if (saved){
     liveState = saved;
+    viewSeat = saved.mySeat; // 💡 重新整理／回來繼續打，也預設顯示自己的每局明細
     document.getElementById('setup-wizard').style.display = 'none';
     document.getElementById('scoring-app').style.display = '';
     liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
