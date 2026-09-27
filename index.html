@@ -295,12 +295,7 @@
   <div id="scoring-app" style="display:none;">
     <div class="players" id="live-players"></div>
     <div id="live-form-wrap" style="padding:0 16px 14px;"></div>
-    <div class="tabbar" id="live-tabbar">
-      <button data-live-tab="score" class="active">🀄 記分</button>
-      <button data-live-tab="report">📊 戰報</button>
-    </div>
-    <div id="live-score-panel"></div>
-    <div id="live-report-panel" style="display:none;"></div>
+    <div id="live-report-panel"></div>
   </div>
 </div>
 
@@ -313,6 +308,7 @@
   <div class="eyebrow">麻將戰報 · Mahjong Report</div>
   <h1 id="h-title">讀取中…</h1>
   <div class="progress" id="h-progress"></div>
+  <div class="progress" id="h-time"></div>
   <span class="badge" id="h-badge"></span>
   <div class="trim-note" id="h-trim" style="display:none;"></div>
 </header>
@@ -450,6 +446,10 @@ function renderHeader(){
   }
   document.getElementById('h-title').textContent = `${NAMES[viewSeat]}(${WINDS[viewSeat]}) 的戰報`;
   document.getElementById('h-progress').textContent = `共打了 ${DATA.tr} 局・進度：${DATA.prog}`;
+  const timeEl = document.getElementById('h-time');
+  if (timeEl){
+    timeEl.textContent = DATA.et ? `🕒 開始：${DATA.st}　結束：${DATA.et}` : `🕒 開始：${DATA.st}`;
+  }
   const badge = document.getElementById('h-badge');
   badge.textContent = DATA.final ? '🏁 已結算' : '🀄 進行中';
   if (DATA.trimmed){
@@ -868,7 +868,7 @@ function initGameState(){
   return {
     startingChips: 0, baseScore: 30, taiScore: 10, mySeat: 0,
     roundIdx: 0, dealerIdx: 0, streak: 0, jiangCount: 0, isFinal: false, trackShanten: false,
-    startTime: formatDateTimeNow(),
+    startTime: formatDateTimeNow(), endTime: null,
     names: ['東','南','西','北'],
     stats: {
       sd_me:{count:0, records:[], money:0}, win:{count:0, records:[], money:0},
@@ -961,7 +961,7 @@ function engineExecuteSubmit(state, form){
       if (s.roundIdx===4){ s.roundIdx=0; s.jiangCount+=1; jiangFinished=true; }
     }
   }
-  if (jiangFinished) s.isFinal = true;
+  if (jiangFinished){ s.isFinal = true; s.endTime = formatDateTimeNow(); }
   return {state: s, jiangFinished};
 }
 
@@ -1120,6 +1120,7 @@ function buildLiveData(state){
     names: state.names, dealerNow: state.dealerIdx,
     p: state.pStats.map(p => [p.money, p.sd, p.win, p.dealin, p.sd_other]),
     final: state.isFinal, track: state.trackShanten,
+    st: state.startTime, et: state.endTime || null,
     prog: buildProgressString(state), tr: state.tableStats.total_rounds, trimmed: false,
     r: rows, trendAll, trendByJiang,
   };
@@ -1740,15 +1741,6 @@ function renderLiveForm(){
 
   html += `<div class="form-round-info">🀄 【${buildProgressString(liveState)}】${buildDealerNoticeString(liveState)}</div>`;
 
-  const parts = [];
-  if (f.winner==='draw') parts.push('💨 臭連');
-  else if (f.winner!==null) parts.push(`🀄 ${playerLabelLive(f.winner,false).split(' ').slice(1).join(' ')} 胡`);
-  if (f.type==='tsumo') parts.push('🌟 自摸');
-  else if (f.type==='ron' && f.loser!==null) parts.push(`👉 ${liveState.names[f.loser]} 放槍`);
-  if (f.tai!==null) parts.push(`${f.tai}台`);
-  if (f.shanten!==null) parts.push(SHANTEN_NAMES[String(f.shanten)]||'');
-  html += `<div class="form-hint-card">${parts.length ? '📝 目前選擇：<b>'+parts.join('　')+'</b>' : '📝 請直接點選（順序不限，選滿自動記錄）'}</div>`;
-
   html += `<div class="form-section-title">① 誰胡牌${missing.includes('winner')?'':' ✅'}</div>`;
   html += `<div class="form-grid2">` + order.map(i =>
     `<button class="form-pbtn ${f.winner===i?'selected':''}" data-act="w" data-i="${i}">${playerLabelLive(i, f.winner===i)}</button>`
@@ -1908,16 +1900,6 @@ function showSaveCodePanel(title){
     navigator.clipboard?.writeText(code).then(()=>alert('已複製存檔碼！')).catch(()=>alert('複製失敗，請手動選取文字複製。'));
   };
 }
-
-document.querySelectorAll('#live-tabbar button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('#live-tabbar button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    const isScore = btn.dataset.liveTab === 'score';
-    document.getElementById('live-score-panel').style.display = isScore ? '' : 'none';
-    document.getElementById('live-report-panel').style.display = isScore ? 'none' : '';
-  });
-});
 
 function initLiveMode(){
   document.getElementById('report-view').style.display = 'none';
