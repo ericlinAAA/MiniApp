@@ -252,6 +252,18 @@
     background:var(--tile); border:1px solid var(--line); border-radius:14px;
     padding:12px 14px; margin-bottom:12px; box-shadow:var(--shadow); font-size:13px; color:var(--ink);
   }
+  .form-round-info{
+    font-size:12.5px; font-weight:700; color:var(--on-felt); background:var(--felt-mid);
+    border-radius:10px; padding:8px 12px; margin-bottom:10px; text-align:center;
+  }
+  .live-toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(8px);
+    background:rgba(30,22,8,.94); color:#F6F1E3; padding:10px 20px; border-radius:999px;
+    font-size:13px; font-weight:700; opacity:0; pointer-events:none; white-space:nowrap;
+    transition:opacity .28s ease, transform .28s ease; z-index:999;
+    box-shadow:0 8px 20px rgba(0,0,0,.28);
+  }
+  .live-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
   .form-sys-row{ display:flex; gap:8px; margin-top:10px; }
   .form-sys-row button{
     flex:1; appearance:none; border:1.5px solid var(--line); background:var(--tile-2);
@@ -275,6 +287,8 @@
     <h1 id="live-title">設定新局</h1>
     <div class="progress" id="live-progress"></div>
   </header>
+
+  <div id="live-toast" class="live-toast"></div>
 
   <div id="setup-wizard" style="padding:16px;"></div>
 
@@ -1166,6 +1180,23 @@ function buildProgressString(state){
   return `第${j+1}將 ${WINDS[r]}風${WINDS[d]}局`;
 }
 
+// 對應 Python 版 dealer_notice：誰上莊、連了幾莊
+function buildDealerNoticeString(state){
+  const dealerName = state.names[state.dealerIdx];
+  return state.streak > 0 ? `${dealerName}連莊 ${state.streak}` : `${dealerName}上莊`;
+}
+
+// 淡入淡出提示框：記錄成功時給個明確回饋，避免使用者不確定有沒有點成功
+let toastTimer = null;
+function showToast(msg){
+  const el = document.getElementById('live-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); }, 1500);
+}
+
 // ============================================================
 // 本機儲存（相當於「自動存檔」）：關掉網頁重開會自動接續打到一半的進度
 // ============================================================
@@ -1639,12 +1670,14 @@ function trySubmitLiveForm(){
   if (liveForm.shanten === null){
     liveForm.shanten = (liveForm.winner !== 'draw' && liveForm.winner === liveState.mySeat) ? '0' : null;
   }
+  const isDraw = liveForm.winner === 'draw';
   const { state, jiangFinished } = engineExecuteSubmit(liveState, liveForm);
   liveState = state;
   liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
   liveTaiPage = 0;
   saveLiveState(liveState);
   renderLiveApp();
+  showToast(isDraw ? '💨 已記錄臭連' : '✅ 已記錄本局結果');
   if (jiangFinished) showSaveCodePanel('🏁 這將結束了！自動產生存檔碼：');
 }
 
@@ -1702,6 +1735,8 @@ function renderLiveForm(){
   const order = [kami, toi, my, shimo];
 
   let html = '';
+
+  html += `<div class="form-round-info">🀄 【${buildProgressString(liveState)}】${buildDealerNoticeString(liveState)}</div>`;
 
   const parts = [];
   if (f.winner==='draw') parts.push('💨 臭連');
