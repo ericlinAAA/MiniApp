@@ -348,6 +348,7 @@ const SUIT_COLORS = ['#962525', '#046314', '#255296', '#6D5005'];
 const SUIT_COLORS_DARK = ['#DD9B9B', '#82BA8B', '#97B1D8', '#BFAF85'];
 const suitColor = (i) => (scheme === 'dark' ? SUIT_COLORS_DARK : SUIT_COLORS)[i];
 const WINDS = ['東','南','西','北'];
+const PRESET_NAMES = ["把拔", "馬麻", "姑姑", "大葛格", "小葛格", "哲弘", "鈺蒨", "鈺靜", "宜瑄", "威琛", "沛妤", "鎧欣", "毓智", "采瑞", "泰民"];
 const SHANTEN_NAMES = {'0': '聽牌', '1': '1進聽', 'away': '走遠了', 'notready': '沒聽牌'};
 const TYPE_RON = 0, TYPE_TSUMO = 1, TYPE_DRAW = 2;
 
@@ -874,7 +875,9 @@ function engineExecuteSubmit(state, form){
   const { undoStack: prevUndoStack, ...stateWithoutUndo } = state;
   const snapshot = deepClone(stateWithoutUndo);
   const s = deepClone(stateWithoutUndo);
-  s.undoStack = [...(prevUndoStack||[]), snapshot];
+  // 💡 把這次送出用的表單選擇（誰胡誰、台數、聽牌狀況）跟狀態快照一起存起來，
+  //    這樣撤銷上一局時可以把原本選的按鈕都帶回來，只需要修正錯的欄位（例如台數打錯）。
+  s.undoStack = [...(prevUndoStack||[]), {snapshot, form: deepClone(form)}];
 
   const currRoundIdx = s.roundIdx, currDealerIdx = s.dealerIdx, currStreak = s.streak, mySeat = s.mySeat;
   s.tableStats.total_rounds += 1;
@@ -948,11 +951,16 @@ function engineExecuteSubmit(state, form){
 }
 
 function engineUndo(state){
-  if (!state.undoStack || state.undoStack.length===0) return state;
+  if (!state.undoStack || state.undoStack.length===0) return {state, form:null};
   const stack = state.undoStack.slice(0,-1);
-  const prev = deepClone(state.undoStack[state.undoStack.length-1]);
+  const entry = state.undoStack[state.undoStack.length-1];
+  // 相容舊格式：舊存檔的 undoStack 項目本身就是狀態快照（沒有 .snapshot 欄位），
+  // 這種情況就沒有表單可以還原，form 給 null 即可。
+  const hasFormWrapper = entry && typeof entry === 'object' && 'snapshot' in entry;
+  const prev = deepClone(hasFormWrapper ? entry.snapshot : entry);
   prev.undoStack = stack;
-  return prev;
+  const restoredForm = hasFormWrapper ? deepClone(entry.form) : null;
+  return {state: prev, form: restoredForm};
 }
 
 function buildSaveDataObject(state){
@@ -1192,11 +1200,44 @@ function sanitizeNameJS(raw, seatIdx, namesArr){
 let wiz = {
   step: 'welcome', mode: 'new',
   tempNames: ['','','',''],
+  importPasteText: '',
   importedNames: [], importedData: null, importKind: null, // 'save' | 'plain'
   windAssign: [null,null,null,null], remainingNames: [],
-  chips: 0, base: 100, tai: 20, trackShanten: false,
+  chips: 0, base: 30, tai: 10, trackShanten: false,
   error: '',
 };
+
+// 依目前步驟往回走一步，並復原該步驟改動過的資料（避免中途填錯就要整個重來）
+function wizBack(){
+  wiz.error = '';
+  const step = wiz.step;
+  if (step === 'welcome') return;
+  if (step === 'import_paste'){ wizGoto('welcome'); return; }
+  if (step === 'chips'){ wizGoto('welcome'); return; }
+  if (step === 'stake'){ wizGoto('chips'); return; }
+  if (step === 'shanten_toggle'){ wizGoto('stake'); return; }
+  if (step === 'names'){ wizGoto('shanten_toggle'); return; }
+  if (step === 'my_seat'){
+    const name = wiz.windAssign[3];
+    wiz.windAssign[3] = null;
+    if (name) wiz.remainingNames.push(name);
+    wizGoto('wind_3');
+    return;
+  }
+  if (step.startsWith('wind_')){
+    const idx = parseInt(step.split('_')[1], 10);
+    if (idx === 0){
+      wizGoto(wiz.mode === 'import' ? 'import_paste' : 'names');
+      return;
+    }
+    const prevIdx = idx - 1;
+    const name = wiz.windAssign[prevIdx];
+    wiz.windAssign[prevIdx] = null;
+    if (name) wiz.remainingNames.push(name);
+    wizGoto(`wind_${prevIdx}`);
+    return;
+  }
+}
 
 function wizGoto(step){ wiz.step = step; wiz.error=''; renderWizard(); }
 
@@ -1224,13 +1265,14 @@ function renderWizard(){
     el.innerHTML = `
       <div class="wiz-step">
         <div class="wiz-label">貼上存檔碼（[SaveCodeV2]...[/SaveCodeV2]）或舊版戰報文字：</div>
-        <textarea class="wiz-textarea" id="import-text" placeholder="貼在這裡…"></textarea>
+        <textarea class="wiz-textarea" id="import-text" placeholder="貼在這裡…">${wiz.importPasteText||''}</textarea>
         ${errBox()}
         <button class="wiz-primary-btn" id="btn-parse">解析</button>
-        <button class="wiz-secondary-btn" id="btn-back">⬅️ 返回</button>
+        <button class="wiz-secondary-btn" id="btn-back">⬅️ 上一步</button>
       </div>`;
     document.getElementById('btn-parse').onclick = () => {
       const text = document.getElementById('import-text').value.trim();
+      wiz.importPasteText = document.getElementById('import-text').value;
       if (!text){ wiz.error='請先貼上內容'; renderWizard(); return; }
       let data = importFromSaveCode(text);
       if (data){
@@ -1248,7 +1290,7 @@ function renderWizard(){
       wiz.windAssign = [null,null,null,null];
       wizGoto('wind_0');
     };
-    document.getElementById('btn-back').onclick = () => wizGoto('welcome');
+    document.getElementById('btn-back').onclick = wizBack;
     return;
   }
 
@@ -1262,6 +1304,7 @@ function renderWizard(){
         </div>
         <input class="wiz-input" id="chips-custom" type="number" placeholder="或輸入自訂數字" style="margin-top:8px;">
         <button class="wiz-primary-btn" id="btn-chips-next">下一步</button>
+        <button class="wiz-secondary-btn" id="btn-chips-back">⬅️ 上一步</button>
       </div>`;
     el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
       wiz.chips = parseInt(b.dataset.v, 10);
@@ -1272,22 +1315,24 @@ function renderWizard(){
       wiz.chips = isNaN(v) ? 0 : v;
       wizGoto('stake');
     };
+    document.getElementById('btn-chips-back').onclick = wizBack;
     return;
   }
 
   if (wiz.step === 'stake'){
-    const presets = [[30,10],[50,10],[100,20],[1000,200]];
+    const presets = [[30,10],[5,1],[1000,200]];
     el.innerHTML = `
       <div class="wiz-step">
-        <div class="wiz-label">台底設定（底/台）</div>
+        <div class="wiz-label">台底設定（底/台，預設 30/10）</div>
         <div class="wiz-grid">
-          ${presets.map(([b,t]) => `<button class="wiz-btn" data-b="${b}" data-t="${t}">${b}/${t}</button>`).join('')}
+          ${presets.map(([b,t]) => `<button class="wiz-btn${(wiz.base===b && wiz.tai===t)?' active':''}" data-b="${b}" data-t="${t}">${b}/${t}</button>`).join('')}
         </div>
         <div style="display:flex; gap:8px; margin-top:8px;">
-          <input class="wiz-input" id="stake-base" type="number" placeholder="底" style="margin-bottom:0;">
-          <input class="wiz-input" id="stake-tai" type="number" placeholder="台" style="margin-bottom:0;">
+          <input class="wiz-input" id="stake-base" type="number" placeholder="自行輸入：底" style="margin-bottom:0;">
+          <input class="wiz-input" id="stake-tai" type="number" placeholder="自行輸入：台" style="margin-bottom:0;">
         </div>
         <button class="wiz-primary-btn" id="btn-stake-next">下一步</button>
+        <button class="wiz-secondary-btn" id="btn-stake-back">⬅️ 上一步</button>
       </div>`;
     el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
       wiz.base = parseInt(b.dataset.b,10); wiz.tai = parseInt(b.dataset.t,10);
@@ -1300,22 +1345,25 @@ function renderWizard(){
       if (!isNaN(t)) wiz.tai = t;
       wizGoto('shanten_toggle');
     };
+    document.getElementById('btn-stake-back').onclick = wizBack;
     return;
   }
 
   if (wiz.step === 'shanten_toggle'){
     el.innerHTML = `
       <div class="wiz-step">
-        <div class="wiz-label">要追蹤聽牌率嗎？（放槍時會多問一句目前是不是聽牌）</div>
+        <div class="wiz-label">要追蹤聽牌率嗎？（每局都會多問目前是不是聽牌，預設關閉）</div>
         <div class="wiz-grid">
-          <button class="wiz-btn" data-v="1">✅ 開啟</button>
-          <button class="wiz-btn" data-v="0">關閉</button>
+          <button class="wiz-btn${wiz.trackShanten ? ' active' : ''}" data-v="1">開啟</button>
+          <button class="wiz-btn${wiz.trackShanten ? '' : ' active'}" data-v="0">關閉</button>
         </div>
+        <button class="wiz-secondary-btn" id="btn-shanten-back">⬅️ 上一步</button>
       </div>`;
     el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
       wiz.trackShanten = b.dataset.v === '1';
       wizGoto('names');
     });
+    document.getElementById('btn-shanten-back').onclick = wizBack;
     return;
   }
 
@@ -1325,8 +1373,22 @@ function renderWizard(){
         <div class="wiz-label">先輸入四位玩家的名字（還不用管誰坐哪一家）</div>
         ${[0,1,2,3].map(i => `<input class="wiz-input" id="name-${i}" placeholder="玩家 ${i+1}" maxlength="6" value="${wiz.tempNames[i]||''}">`).join('')}
         ${errBox()}
+        <div class="wiz-label" style="margin-top:10px;">快速選取常用玩家：</div>
+        <div class="wiz-grid" style="grid-template-columns:repeat(3,1fr);">
+          ${PRESET_NAMES.map(n => `<button type="button" class="wiz-btn preset-name-btn" data-name="${n}">${n}</button>`).join('')}
+        </div>
         <button class="wiz-primary-btn" id="btn-names-next">下一步：抓位</button>
+        <button class="wiz-secondary-btn" id="btn-names-back">⬅️ 上一步</button>
       </div>`;
+    el.querySelectorAll('.preset-name-btn').forEach(btn => {
+      btn.onclick = () => {
+        const n = btn.dataset.name;
+        for (let i=0;i<4;i++){
+          const inp = document.getElementById(`name-${i}`);
+          if (!inp.value.trim()){ inp.value = n; break; }
+        }
+      };
+    });
     document.getElementById('btn-names-next').onclick = () => {
       const vals = [0,1,2,3].map(i => document.getElementById(`name-${i}`).value);
       const cleaned = [];
@@ -1339,6 +1401,10 @@ function renderWizard(){
       wiz.remainingNames = cleaned.slice();
       wiz.windAssign = [null,null,null,null];
       wizGoto('wind_0');
+    };
+    document.getElementById('btn-names-back').onclick = () => {
+      wiz.tempNames = [0,1,2,3].map(i => document.getElementById(`name-${i}`).value);
+      wizBack();
     };
     return;
   }
@@ -1354,11 +1420,13 @@ function renderWizard(){
           <div class="wiz-label">最後一位自動歸為「${windLabel}」風位：</div>
           <div class="wiz-hint-card form-hint-card">${wiz.remainingNames[0]}</div>
           <button class="wiz-primary-btn" id="btn-confirm-last">確認</button>
+          <button class="wiz-secondary-btn" id="btn-wind-back">⬅️ 上一步</button>
         </div>`;
       document.getElementById('btn-confirm-last').onclick = () => {
         wiz.windAssign[3] = wiz.remainingNames[0];
         wizGoto('my_seat');
       };
+      document.getElementById('btn-wind-back').onclick = wizBack;
       return;
     }
 
@@ -1368,6 +1436,7 @@ function renderWizard(){
         <div class="wiz-grid">
           ${wiz.remainingNames.map(n => `<button class="wiz-btn" data-n="${n}">${n}</button>`).join('')}
         </div>
+        <button class="wiz-secondary-btn" id="btn-wind-back">⬅️ 上一步</button>
       </div>`;
     el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
       const n = b.dataset.n;
@@ -1375,6 +1444,7 @@ function renderWizard(){
       wiz.remainingNames = wiz.remainingNames.filter(x => x !== n);
       wizGoto(windIdx < 3 ? `wind_${windIdx+1}` : 'my_seat');
     });
+    document.getElementById('btn-wind-back').onclick = wizBack;
     return;
   }
 
@@ -1385,10 +1455,12 @@ function renderWizard(){
         <div class="wiz-grid">
           ${wiz.windAssign.map((n,i) => `<button class="wiz-btn" data-i="${i}">${WINDS[i]}：${n}</button>`).join('')}
         </div>
+        <button class="wiz-secondary-btn" id="btn-myseat-back">⬅️ 上一步</button>
       </div>`;
     el.querySelectorAll('.wiz-btn').forEach(b => b.onclick = () => {
       finalizeSetup(parseInt(b.dataset.i,10));
     });
+    document.getElementById('btn-myseat-back').onclick = wizBack;
     return;
   }
 }
@@ -1727,7 +1799,10 @@ function handleLiveFormAction(act, i){
     liveForm = {winner:null, type:null, loser:null, tai:null, shanten:null};
     renderLiveForm();
   } else if (act === 'undo'){
-    liveState = engineUndo(liveState);
+    const result = engineUndo(liveState);
+    liveState = result.state;
+    liveForm = result.form ? deepClone(result.form) : {winner:null, type:null, loser:null, tai:null, shanten:null};
+    liveTaiPage = 0;
     saveLiveState(liveState);
     renderLiveApp();
   } else if (act === 'finalize'){
