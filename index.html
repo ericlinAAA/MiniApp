@@ -66,6 +66,7 @@
   header.hero .eyebrow{font-size:13px; opacity:.7; letter-spacing:.02em;}
   header.hero h1{margin:2px 0 0; font-size:22px; font-weight:700;}
   header.hero .progress{margin-top:6px; font-size:14px; opacity:.85;}
+  #h-time{white-space:pre-line; line-height:1.6;}
   header.hero .badge{
     display:inline-block; margin-top:8px; padding:3px 10px; border-radius:20px;
     background:rgba(255,255,255,.12); font-size:12px;
@@ -454,6 +455,36 @@ function formatDuration(startStr, endStr){
   return `${Math.floor(mins/60)} 小時 ${mins%60} 分鐘`;
 }
 
+// 每一將各自的「開始～結束・耗時」；多將時最後再列各將加總
+function durMinutes(startStr, endStr){
+  const a = parseDateTimeStr(startStr), b = endStr ? parseDateTimeStr(endStr) : new Date();
+  if (!a || !b) return null;
+  return Math.max(0, Math.round((b - a) / 60000));
+}
+function fmtMinutes(m){ return `${Math.floor(m/60)} 小時 ${m%60} 分鐘`; }
+function buildTimeLines(){
+  if (!DATA) return '';
+  const jt = Array.isArray(DATA.jt) && DATA.jt.length ? DATA.jt : (DATA.st ? [[0, DATA.st, DATA.et||null]] : []);
+  if (!jt.length) return '';
+  const lines = [];
+  let total = 0, counted = 0;
+  jt.forEach(([j, st, et], i) => {
+    const running = !et && i === jt.length - 1 && !DATA.final;
+    const m = st ? (et || running ? durMinutes(st, et) : null) : null;
+    let tail;
+    if (et) tail = `結束 ${et}`;
+    else if (running) tail = '進行中';
+    else tail = '結束 未記錄';
+    let line = `🕒 第${j+1}將　開始 ${st || '未記錄'}　${tail}`;
+    if (m !== null){ line += `　耗時 ${fmtMinutes(m)}`; total += m; counted++; }
+    lines.push(line);
+  });
+  if (jt.length > 1 && counted > 1){
+    lines.push(`⏱️ 各將耗時合計 ${fmtMinutes(total)}` + (counted < jt.length ? '（未記錄時間的將不計入）' : ''));
+  }
+  return lines.join('\n');
+}
+
 function renderHeader(){
   if (!DATA){
     document.getElementById('h-title').textContent = '找不到戰報資料';
@@ -463,12 +494,7 @@ function renderHeader(){
   document.getElementById('h-title').textContent = `${NAMES[viewSeat]}(${WINDS[viewSeat]}) 的戰報`;
   document.getElementById('h-progress').textContent = `共打了 ${DATA.tr} 局・進度：${DATA.prog}`;
   const timeEl = document.getElementById('h-time');
-  if (timeEl && DATA.st){
-    const dur = formatDuration(DATA.st, DATA.et);
-    timeEl.textContent = DATA.et
-      ? `🕒 開始：${DATA.st}　結束：${DATA.et}（耗時 ${dur}）`
-      : `🕒 開始：${DATA.st}（進行中・已 ${dur}）`;
-  }
+  if (timeEl) timeEl.textContent = buildTimeLines();
   const badge = document.getElementById('h-badge');
   badge.textContent = DATA.final ? '🏁 已結算' : '🀄 進行中';
   if (DATA.trimmed){
@@ -884,10 +910,18 @@ document.querySelectorAll('.tabbar button').forEach(btn=>{
 function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 
 function initGameState(){
+  const nowStr = formatDateTimeNow();
+  const st = _initGameStateBody();
+  st.startTime = nowStr;
+  st.jiangTimes = [{jiang:0, start:nowStr, end:null}];
+  return st;
+}
+function _initGameStateBody(){
   return {
     startingChips: 0, baseScore: 30, taiScore: 10, mySeat: 0,
     roundIdx: 0, dealerIdx: 0, streak: 0, jiangCount: 0, isFinal: false, trackShanten: false,
     startTime: formatDateTimeNow(), endTime: null,
+    jiangTimes: [{jiang:0, start:null, end:null}], // 每一將各自的開始/結束時間（建立時補上 start）
     names: ['東','南','西','北'],
     stats: {
       sd_me:{count:0, records:[], money:0}, win:{count:0, records:[], money:0},
@@ -903,6 +937,50 @@ function initGameState(){
 function formatDateTimeNow(){
   const d = new Date(); const pad=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ---- 每一將的開始/結束時間 ----
+// jiangTimes = [{jiang: 0起算的將序號, start, end}]，end 為 null 代表這將還沒結束。
+// 規則：
+//  - 打完一將 / 提前結算 → 把「該將」的結束時間補上（jtMarkEnd）
+//  - 繼承（匯入）或撤銷結算 → 若那一將被提前結算過，就把結束時間清掉、接著打（同一將，開始時間不變）；
+//    若上一將是正常打完，則從現在開始一個新的將（jtEnsureRunning）
+function jtFind(state, idx){ return (state.jiangTimes||[]).find(t => t.jiang === idx); }
+function jtMarkEnd(state, idx){
+  const now = formatDateTimeNow();
+  const t = jtFind(state, idx);
+  if (t) t.end = now;
+  state.endTime = now;
+}
+function jtEnsureRunning(state){
+  state.jiangTimes = state.jiangTimes || [];
+  for (let i = 0; i < state.jiangCount; i++){
+    if (!jtFind(state, i)) state.jiangTimes.push({jiang:i, start:null, end:null}); // 更早的將時間未知
+  }
+  const cur = jtFind(state, state.jiangCount);
+  if (cur) cur.end = null;
+  else state.jiangTimes.push({jiang:state.jiangCount, start:formatDateTimeNow(), end:null});
+  state.jiangTimes.sort((a,b) => a.jiang - b.jiang);
+  state.endTime = null;
+}
+// 舊存檔／舊的本機進度沒有 jiangTimes 時，用 startTime/endTime 盡量還原
+function jtFromLegacy(jiangCount, isFinalNatural, isFinal, startTime, endTime){
+  const list = [];
+  for (let i = 0; i < jiangCount; i++){
+    list.push({jiang:i, start: i===0 ? (startTime||null) : null,
+               end: (i === jiangCount-1 && (isFinalNatural || isFinal)) ? (endTime||null) : null});
+  }
+  if (!isFinalNatural){
+    list.push({jiang:jiangCount, start: jiangCount===0 ? (startTime||null) : null, end: isFinal ? (endTime||null) : null});
+  }
+  return list;
+}
+function jtMigrate(state){
+  if (Array.isArray(state.jiangTimes) && state.jiangTimes.length) return state;
+  const natural = state.isFinal && state.roundIdx===0 && state.dealerIdx===0 && state.streak===0
+                  && state.jiangCount>0 && (state.roundLog||[]).length>0;
+  state.jiangTimes = jtFromLegacy(state.jiangCount, natural, state.isFinal, state.startTime, state.endTime);
+  return state;
 }
 
 function engineExecuteSubmit(state, form){
@@ -980,7 +1058,7 @@ function engineExecuteSubmit(state, form){
       if (s.roundIdx===4){ s.roundIdx=0; s.jiangCount+=1; jiangFinished=true; }
     }
   }
-  if (jiangFinished){ s.isFinal = true; s.endTime = formatDateTimeNow(); }
+  if (jiangFinished){ s.isFinal = true; jtMarkEnd(s, s.jiangCount - 1); } // jiangCount 已 +1，剛打完的是上一個序號
   return {state: s, jiangFinished};
 }
 
@@ -1001,7 +1079,7 @@ function buildSaveDataObject(state){
   const pStatsObj = {};
   state.pStats.forEach((p,i)=>{ pStatsObj[String(i)] = p; });
   return {
-    v:3, start_time:state.startTime, end_time: state.endTime || null, chips:state.startingChips, base:state.baseScore, tai:state.taiScore,
+    v:4, start_time:state.startTime, end_time: state.endTime || null, jiang_times: state.jiangTimes, chips:state.startingChips, base:state.baseScore, tai:state.taiScore,
     names:state.names, p_stats:pStatsObj, stats:state.stats, table_stats:state.tableStats,
     shanten_stats:state.shantenStats, history:[], round_log:state.roundLog, my_seat:state.mySeat,
     jiang:state.jiangCount, round:state.roundIdx, dealer:state.dealerIdx, streak:state.streak, track:state.trackShanten,
@@ -1077,6 +1155,8 @@ function importFromSaveCode(text){
     names: saveData.names, pStats, stats: saveData.stats, tableStats: saveData.table_stats,
     shantenStats: saveData.shanten_stats, roundLog,
     chips: saveData.chips, base: saveData.base, tai: saveData.tai,
+    startTime: saveData.start_time || null, endTime: saveData.end_time || null,
+    jiangTimes: Array.isArray(saveData.jiang_times) ? saveData.jiang_times : null,
     jiang: saveData.jiang, round: saveData.round, dealer: saveData.dealer,
     streak: saveData.streak, track: saveData.track,
   };
@@ -1140,6 +1220,7 @@ function buildLiveData(state){
     p: state.pStats.map(p => [p.money, p.sd, p.win, p.dealin, p.sd_other]),
     final: state.isFinal, track: state.trackShanten,
     st: state.startTime, et: state.endTime || null,
+    jt: (state.jiangTimes || []).map(t => [t.jiang, t.start || null, t.end || null]),
     prog: buildProgressString(state), tr: state.tableStats.total_rounds, trimmed: false,
     r: rows, trendAll, trendByJiang,
   };
@@ -1228,7 +1309,7 @@ function saveLiveState(state){
 function loadLiveState(){
   try {
     const raw = localStorage.getItem(LIVE_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    return raw ? jtMigrate(JSON.parse(raw)) : null;
   } catch(e){ return null; }
 }
 function clearLiveState(){
@@ -1533,7 +1614,7 @@ function finalizeSetup(mySeat){
     const nameToNewSeat = {};
     wiz.windAssign.forEach((name, newSeat) => { nameToNewSeat[name] = newSeat; });
 
-    state.startingChips = 0;
+    state.startingChips = d.chips || 0; // 之前寫死 0，導致 30000 的起始籌碼匯入後消失、只剩 +盈虧
     state.baseScore = d.base;
     state.taiScore = d.tai;
     state.trackShanten = !!d.track;
@@ -1545,8 +1626,17 @@ function finalizeSetup(mySeat){
     state.shantenStats = d.shantenStats || state.shantenStats;
     // 💡 之前這裡完全沒還原開始時間：存檔碼裡明明有 start_time，卻只挑了統計數字回填，
     //    導致繼續打之後時間變成「重新匯入的當下」而不是最初開局的時間。
-    if (d.start_time) state.startTime = d.start_time;
-    state.endTime = null; // 繼續進行中，視為尚未結束
+    if (d.startTime) state.startTime = d.startTime; // 保留最初開局時間，不要被「匯入當下」蓋掉
+    // 每將時間：有就沿用，沒有（舊存檔）就盡量還原；然後「繼承」＝
+    //   被提前結算的那一將 → 清掉結束時間接著打；上一將正常打完 → 從現在開始新的一將
+    if (Array.isArray(d.jiangTimes) && d.jiangTimes.length){
+      state.jiangTimes = deepClone(d.jiangTimes);
+    } else {
+      const natural = (state.roundIdx===0 && state.dealerIdx===0 && state.streak===0 && state.jiangCount>0);
+      state.jiangTimes = jtFromLegacy(state.jiangCount, natural, natural || !!d.endTime, d.startTime, d.endTime);
+    }
+    jtEnsureRunning(state);
+    if (state.jiangTimes[0] && state.jiangTimes[0].start) state.startTime = state.jiangTimes[0].start;
 
     if (wiz.importKind === 'save'){
       // pStats/roundLog 用的是「舊座位編號」，直接用 舊索引→名字→新座位 做轉換
@@ -1596,6 +1686,8 @@ function importFromPlainReport(text){
     raw = [...text.matchAll(/\[(.*?)\] 💰 ([+-]?\d+)\s*元/gu)];
     if (raw.length !== 4) return null;
   }
+  const chipM = text.match(/起始籌碼：\s*(\d+)/);
+  const startM = text.match(/開始：\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
   const stakeM = text.match(/底台：(\d+)\/(\d+)/);
   const base = stakeM ? parseInt(stakeM[1],10) : 30;
   const tai = stakeM ? parseInt(stakeM[2],10) : 10;
@@ -1648,7 +1740,8 @@ function importFromPlainReport(text){
     dealin: parseStatBlockText(text,'放槍'), sd_other: parseStatBlockText(text,'被摸'),
   };
   return {
-    names, importData: cleanedPlayers, base, tai, chips:0,
+    names, importData: cleanedPlayers, base, tai, chips: chipM ? parseInt(chipM[1],10) : 0,
+    startTime: startM ? startM[1] : null, endTime: null,
     jiang: jiangCount, round: roundIdx, dealer: dealerIdx, streak,
     tableStats: {total_rounds: totalRounds}, shantenStats, stats, roundLog,
   };
@@ -1860,6 +1953,7 @@ function handleLiveFormAction(act, i){
   } else if (act === 'finalize'){
     if (confirm('確定要提前結算嗎？結算後可以在下方撤銷回到牌局。')){
       liveState.isFinal = true;
+      jtMarkEnd(liveState, liveState.jiangCount); // 提前結算：先把這一將的結束時間標上去
       saveLiveState(liveState);
       renderLiveApp();
       showSaveCodePanel('🛑 已提前結算，存檔碼：');
@@ -1880,14 +1974,14 @@ function renderFinalPanel(){
     </div>
     <div id="savecode-panel"></div>`;
   el.querySelector('[data-act="undo-final"]').onclick = () => {
-    liveState.isFinal = false; saveLiveState(liveState); renderLiveApp();
+    liveState.isFinal = false; jtEnsureRunning(liveState); saveLiveState(liveState); renderLiveApp();
   };
   el.querySelector('[data-act="show-savecode"]').onclick = () => showSaveCodePanel('💾 存檔碼：');
   el.querySelector('[data-act="new-game"]').onclick = () => {
     if (confirm('確定要開始新的一局嗎？目前這局的存檔碼記得先保存喔。')){
       clearLiveState();
       wiz = {step:'welcome', mode:'new', tempNames:['','','',''], importedNames:[], importedData:null,
-             importKind:null, windAssign:[null,null,null,null], remainingNames:[], chips:0, base:100, tai:20,
+             importKind:null, importPasteText:'', windAssign:[null,null,null,null], remainingNames:[], chips:0, base:30, tai:10,
              trackShanten:false, error:''};
       document.getElementById('setup-wizard').style.display = '';
       document.getElementById('scoring-app').style.display = 'none';
