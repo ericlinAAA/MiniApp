@@ -438,6 +438,22 @@ function relName(seat){
   return diff===1? '下家' : diff===2? '對家' : '上家';
 }
 
+// 對應 Python 版的「⏳ 總共耗時」：把 "YYYY-MM-DD HH:MM" 字串換算成經過的時間
+function parseDateTimeStr(s){
+  if (!s) return null;
+  const [d, t] = s.split(' ');
+  const [y, mo, da] = d.split('-').map(Number);
+  const [h, mi] = t.split(':').map(Number);
+  return new Date(y, mo-1, da, h, mi);
+}
+function formatDuration(startStr, endStr){
+  const start = parseDateTimeStr(startStr);
+  if (!start) return '';
+  const end = endStr ? parseDateTimeStr(endStr) : new Date();
+  const mins = Math.max(0, Math.round((end - start) / 60000));
+  return `${Math.floor(mins/60)} 小時 ${mins%60} 分鐘`;
+}
+
 function renderHeader(){
   if (!DATA){
     document.getElementById('h-title').textContent = '找不到戰報資料';
@@ -447,8 +463,11 @@ function renderHeader(){
   document.getElementById('h-title').textContent = `${NAMES[viewSeat]}(${WINDS[viewSeat]}) 的戰報`;
   document.getElementById('h-progress').textContent = `共打了 ${DATA.tr} 局・進度：${DATA.prog}`;
   const timeEl = document.getElementById('h-time');
-  if (timeEl){
-    timeEl.textContent = DATA.et ? `🕒 開始：${DATA.st}　結束：${DATA.et}` : `🕒 開始：${DATA.st}`;
+  if (timeEl && DATA.st){
+    const dur = formatDuration(DATA.st, DATA.et);
+    timeEl.textContent = DATA.et
+      ? `🕒 開始：${DATA.st}　結束：${DATA.et}（耗時 ${dur}）`
+      : `🕒 開始：${DATA.st}（進行中・已 ${dur}）`;
   }
   const badge = document.getElementById('h-badge');
   badge.textContent = DATA.final ? '🏁 已結算' : '🀄 進行中';
