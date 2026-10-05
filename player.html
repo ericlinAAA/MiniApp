@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極速播放器</title>
+    <!-- 隱藏來源，降低防盜鏈阻擋機率 -->
+    <meta name="referrer" content="no-referrer">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { margin: 0; background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        video { width: 100%; max-height: 100vh; outline: none; }
+        #error-msg { color: white; font-family: sans-serif; display: none; }
+    </style>
+</head>
+<body>
+    <div id="error-msg">請在網址列提供正確的 ?url= 參數</div>
+    <video id="video" controls autoplay playsinline></video>
+
+    <script>
+        const video = document.getElementById('video');
+        const errorMsg = document.getElementById('error-msg');
+        
+        // 自動抓取網址後方的 ?url= 參數
+        const urlParams = new URLSearchParams(window.location.search);
+        const m3u8Url = urlParams.get('url');
+
+        if (!m3u8Url) {
+            errorMsg.style.display = 'block';
+            video.style.display = 'none';
+        } else {
+            // HLS.js 支援環境 (Android Chrome / PC)
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(m3u8Url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play();
+                });
+            } 
+            // iOS Safari 原生支援
+            else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = m3u8Url;
+                video.addEventListener('loadedmetadata', function() {
+                    video.play();
+                });
+            }
+        }
+    </script>
+</body>
+</html>
